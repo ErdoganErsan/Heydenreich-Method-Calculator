@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>İç Balistik Hesaplayıcı</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&display=swap">
+<style>
+/* Tek koyu tema: kullanıcının isteği. Üç sütun: girdiler | grafik ya da döküm | sonuçlar. */
+:root {
+  color-scheme: dark;
+  --bg: #090d12;
+  --surface: #10161d;
+  --surface-2: #17202a;
+  --field: #0f151c;
+  --ink: #e8edf2;
+  --ink-2: #aab5c0;
+  --muted: #8593a1;
+  --line: #2a3643;
+  --line-soft: #1e2833;
+  --accent: #3987e5;
+  --accent-ink: #06101e;
+  --accent-soft: rgba(57, 135, 229, 0.14);
+  --ok: #0ca30c;
+  --warn: #ec835a;
+  --bad: #d03b3b;
+  --bad-soft: rgba(208, 59, 59, 0.13);
+  --band: rgba(57, 135, 229, 0.2);
+  --font: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { background: var(--bg); }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 var(--font);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 40px;
+}
+.shell { max-width: 1680px; margin: 0 auto; }
+h1, h2, h3, p { margin: 0; }
+button { font: inherit; color: inherit; }
+
+/* Üst çubuk */
+.top {
+  display: flex; align-items: center; gap: 20px 28px; flex-wrap: wrap;
+  padding: 18px 0 14px;
+}
+.brand { display: flex; flex-direction: column; min-width: 0; }
+.brand h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.005em; }
+.brand span { font-size: 13px; color: var(--muted); }
+.nav { display: flex; gap: 4px; flex-wrap: wrap; padding: 4px; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 12px; }
+.nav button {
+  background: none; border: 0; padding: 8px 14px; border-radius: 9px; color: var(--ink-2); cursor: pointer; font-weight: 500; font-size: 14px;
+}
+.nav button:hover { background: var(--surface-2); color: var(--ink); }
+.nav button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
+.nav button:focus-visible, .tabs button:focus-visible, .btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.sharednote { font-size: 13px; color: var(--muted); max-width: 70ch; padding-bottom: 14px; }
+
+/* Üç sütun */
+.cols { display: grid; gap: 16px; grid-template-columns: 1fr; align-items: start; }
+.col-in { order: 1; } .col-out { order: 2; } .col-mid { order: 3; }
+@media (min-width: 1100px) {
+  .cols { grid-template-columns: 250px minmax(0, 1fr) 290px; }
+  .col-in { order: 1; } .col-mid { order: 2; } .col-out { order: 3; }
+}
+.card { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.card h2 { font-size: 16px; font-weight: 600; }
+.card h3 { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.cols.two { max-width: 860px; margin: 0 auto; }
+@media (min-width: 760px) { .cols.two { grid-template-columns: 300px minmax(0, 1fr); } .cols.two .col-in { order: 1; } .cols.two .col-out { order: 2; } }
+.col-in, .col-out, .col-mid { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.sub { color: var(--muted); font-size: 13px; }
+
+/* Girdi alanları */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 13px; color: var(--ink-2); display: flex; justify-content: space-between; gap: 8px; }
+.field label span { color: var(--muted); font-size: 12px; text-align: right; }
+.field input {
+  width: 100%; background: var(--field); color: var(--ink); border: 1px solid var(--line); border-radius: 9px;
+  padding: 10px 12px; font: 500 16px var(--font); min-height: 44px;
+}
+.field input:hover { border-color: #384654; }
+.field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; border-color: var(--accent); }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; background: var(--field); border: 1px solid var(--line-soft); border-radius: 11px; }
+.seg label { position: relative; display: flex; align-items: center; justify-content: center; text-align: center; padding: 8px 6px; border-radius: 8px; font-size: 13px; color: var(--ink-2); cursor: pointer; line-height: 1.25; }
+.seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.seg label:has(input:checked) { background: var(--surface-2); color: var(--ink); box-shadow: inset 0 0 0 1px var(--accent); }
+.seg label:has(input:focus-visible) { outline: 2px solid var(--ink); outline-offset: 1px; }
+.example { font-size: 12px; color: var(--muted); }
+
+/* Hero sonuç */
+.hero { display: flex; flex-direction: column; gap: 6px; }
+.hero .name { font-size: 13px; color: var(--ink-2); }
+.hero .num { font-size: clamp(48px, 7vw, 68px); font-weight: 600; line-height: 1.02; letter-spacing: -0.02em; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.hero .num.long { font-size: clamp(40px, 3.8vw, 54px); }
+.hero .num > span { white-space: nowrap; }
+.hero .num small { font-size: 15px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.hero .aux { font-size: 14px; color: var(--ink-2); }
+.top-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px; font-size: 12.5px; font-weight: 500; background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line); }
+.pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--muted); }
+.pill.ok { color: var(--ink); border-color: rgba(12, 163, 12, 0.5); }
+.pill.ok::before { border: 0; background: var(--ok); content: "✓"; width: 14px; height: 14px; color: #04140a; font-size: 10px; font-weight: 700; display: inline-grid; place-items: center; line-height: 1; }
+.pill.bad { color: var(--ink); border-color: rgba(236, 131, 90, 0.55); }
+.pill.bad::before { border: 0; background: var(--warn); content: "!"; width: 14px; height: 14px; color: #1d0a02; font-size: 10px; font-weight: 700; display: inline-grid; place-items: center; line-height: 1; border-radius: 3px; }
+
+/* Ölçek (meter) */
+.gauge { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+.track { position: relative; height: 10px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line-soft); }
+.track .band { position: absolute; top: -1px; bottom: -1px; background: var(--band); border-radius: 4px; }
+.marker { position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 50%; background: var(--ink); border: 2px solid var(--surface); box-shadow: 0 0 0 2px var(--accent); transform: translate(-50%, -50%); transition: left .25s ease; }
+.marker.bad { box-shadow: 0 0 0 2px var(--warn); }
+.ticks { position: relative; height: 16px; font-size: 11.5px; color: var(--muted); }
+.ticks span { position: absolute; transform: translateX(-50%); font-variant-numeric: tabular-nums; }
+.ticks span:first-child { transform: none; }
+.ticks span:last-child { transform: translateX(-100%); }
+.band-label { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+
+/* Anahtar değer satırları */
+.kv { display: flex; flex-direction: column; }
+.kv .grp { font-size: 12.5px; font-weight: 600; color: var(--ink-2); padding: 12px 0 6px; border-bottom: 1px solid var(--line-soft); }
+.kv .grp:first-child { padding-top: 0; }
+.kv .r { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); font-size: 14px; }
+.kv .r:last-child { border-bottom: 0; }
+.kv .k { color: var(--ink-2); }
+.kv .v { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Uyarılar */
+.alert { background: var(--bad-soft); border-left: 3px solid var(--bad); padding: 10px 12px; border-radius: 6px; font-size: 13.5px; }
+.alert::before { content: "! "; font-weight: 700; color: var(--warn); }
+.hint { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: var(--ink-2); display: flex; flex-direction: column; gap: 2px; }
+.hint b { color: var(--ink); font-weight: 600; font-size: 13px; }
+.msg { font-size: 13.5px; color: var(--ink-2); }
+
+/* Grafik */
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.tabs button { background: var(--field); border: 1px solid var(--line); color: var(--ink-2); padding: 6px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+.tabs button:hover { color: var(--ink); border-color: #384654; }
+.tabs button[aria-selected="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+.btn { background: var(--field); border: 1px solid var(--line); color: var(--ink-2); padding: 6px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+.btn:hover { color: var(--ink); border-color: #384654; }
+.btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+.chart-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.chartbox { position: relative; width: 100%; }
+.chartbox svg { display: block; width: 100%; height: auto; touch-action: pan-y; }
+.chartbox svg text { font-family: var(--font); fill: var(--muted); font-size: 12px; }
+#chartCard { padding: 22px; }
+.chartbox .grid { stroke: var(--line-soft); stroke-width: 1; }
+.chartbox .axis { stroke: var(--line); stroke-width: 1; }
+.chartbox .tickx text { text-anchor: middle; }
+.chartbox .ticky text { text-anchor: end; }
+.chartbox .atitle { fill: var(--ink-2); }
+.tip { position: absolute; pointer-events: none; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; color: var(--ink-2); white-space: nowrap; transform: translate(-50%, -100%); z-index: 2; }
+.tip b { color: var(--ink); font-weight: 600; font-size: 14px; }
+.tip i { display: inline-block; width: 12px; height: 2px; background: var(--accent); vertical-align: middle; margin-right: 6px; }
+.empty { display: grid; place-items: center; min-height: 260px; text-align: center; color: var(--ink-2); font-size: 14px; padding: 20px; border: 1px dashed var(--line); border-radius: 10px; }
+.probe { display: flex; flex-direction: column; gap: 8px; }
+.probe input[type=range] { width: 100%; min-height: 28px; -webkit-appearance: none; appearance: none; background: transparent; margin: 0; }
+.probe input[type=range]::-webkit-slider-runnable-track { height: 4px; background: var(--line); border-radius: 2px; }
+.probe input[type=range]::-moz-range-track { height: 4px; background: var(--line); border-radius: 2px; }
+.probe input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -7px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--accent); }
+.probe input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); }
+.probe input[type=range]:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; border-radius: 4px; }
+.reads { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 640px) { .reads { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.read { background: var(--field); border: 1px solid var(--line-soft); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.read span { font-size: 12px; color: var(--muted); }
+.read b { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.read b small { font-size: 12px; font-weight: 500; color: var(--muted); margin-left: 3px; }
+.tablewrap { overflow-x: auto; border: 1px solid var(--line-soft); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th { text-align: left; font-weight: 600; color: var(--ink-2); padding: 8px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; background: var(--field); }
+td { padding: 7px 12px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.expr { color: var(--ink); }
+td.msg { color: var(--muted); }
+.formula { font-size: 13.5px; background: var(--field); border: 1px solid var(--line-soft); border-radius: 8px; padding: 9px 12px; color: var(--ink-2); overflow-x: auto; }
+details > summary { cursor: pointer; font-weight: 600; font-size: 14px; list-style: none; display: flex; align-items: center; gap: 8px; }
+details > summary::-webkit-details-marker { display: none; }
+details > summary::before { content: "▸"; color: var(--muted); transition: transform .15s; }
+details[open] > summary::before { transform: rotate(90deg); }
+details > summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 4px; }
+details > .inner { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+
+.notes { display: flex; flex-direction: column; gap: 6px; padding: 18px 2px 0; font-size: 13px; color: var(--muted); max-width: 90ch; }
+.notes cite { font-style: normal; color: var(--ink-2); }
+
+/* Teknik föy dili: düz yüzeyler, ince çizgiler, az renk */
+:root { --bg: #0d1115; --surface: #13181d; --surface-2: #1a2027; --field: #0f1418; --ink: #dde3e8; --ink-2: #a6b0ba; --muted: #7d8996; --line: #2b343d; --line-soft: #222a32; --accent: #3987e5; --accent-ink: #06101e; --accent-soft: rgba(57, 135, 229, 0.1); --band: rgba(125, 137, 150, 0.2); --font-h: "IBM Plex Sans Condensed", "IBM Plex Sans", system-ui, sans-serif; }
+.top { border-bottom: 1px solid var(--line); margin-bottom: 18px; padding: 16px 0 0; gap: 12px 28px; align-items: flex-end; }
+.brand { flex-direction: row; align-items: baseline; gap: 12px; padding-bottom: 12px; }
+.brand h1 { font-family: var(--font-h); font-size: 22px; font-weight: 600; letter-spacing: 0.01em; }
+.poc { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 2px; padding: 1px 7px; background: none; }
+.nav { background: none; border: 0; padding: 0; gap: 4px; border-radius: 0; margin-left: 8px; }
+.nav button { border-radius: 0; padding: 12px 14px 10px; border-bottom: 2px solid transparent; font-family: var(--font-h); font-size: 15px; font-weight: 500; color: var(--ink-2); background: none; }
+.nav button:hover { background: none; color: var(--ink); }
+.nav button[aria-selected="true"] { background: none; color: var(--ink); border-bottom-color: var(--accent); box-shadow: none; }
+.lang { background: none; border: 1px solid var(--line); border-radius: 3px; padding: 2px; margin-bottom: 8px; }
+.lang button { border-radius: 2px; padding: 4px 10px; }
+.lang button[aria-pressed="true"] { background: var(--surface-2); box-shadow: none; color: var(--ink); }
+.sharednote { font-size: 13px; }
+.card { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 4px; padding: 16px; gap: 14px; }
+.card::before, .card::after { display: none; }
+.card h2 { font-family: var(--font-h); font-size: 17px; font-weight: 600; letter-spacing: 0.01em; }
+.field input { border-radius: 3px; min-height: 38px; font-size: 15px; background: var(--field); }
+.field input:focus-visible { outline: 0; border-color: var(--ink-2); box-shadow: 0 0 0 1px var(--ink-2); }
+.field label { font-size: 12.5px; }
+.seg { border-radius: 3px; padding: 2px; background: var(--field); border: 1px solid var(--line-soft); }
+.seg label { border-radius: 2px; }
+.seg label:has(input:checked) { background: var(--surface-2); color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+.hero .num { font-family: var(--font-h); font-weight: 500; font-size: clamp(42px, 4.4vw, 58px); letter-spacing: 0; }
+.hero .num.long { font-size: clamp(36px, 3.4vw, 48px); }
+.hero .name { font-family: var(--font-h); font-size: 14px; color: var(--ink-2); }
+.pill { border-radius: 2px; background: none; border: 1px solid var(--line); font-size: 12.5px; }
+.pill.ok { border-color: var(--line); }
+.pill.bad { border-color: var(--warn); }
+.pill.ok::before { border-radius: 1px; }
+.pill.bad::before { border-radius: 1px; }
+.track { height: 6px; border-radius: 1px; background: var(--field); }
+.track .band { border-radius: 0; top: -3px; bottom: -3px; border-left: 1px solid var(--muted); border-right: 1px solid var(--muted); }
+.marker { width: 12px; height: 12px; border-radius: 1px; background: var(--ink); border: 0; box-shadow: 0 0 0 2px var(--surface); transform: translate(-50%, -50%) rotate(45deg); }
+.marker.bad { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--warn); }
+.kv { margin: 0 -2px; }
+.kv .grp { font-family: var(--font-h); font-size: 13px; font-weight: 600; color: var(--ink-2); border-bottom: 1px solid var(--line); padding: 14px 2px 6px; }
+.kv .r { padding: 7px 2px; border-bottom: 1px solid var(--line-soft); }
+.kv .v { font-weight: 500; font-variant-numeric: tabular-nums; }
+.alert { border-radius: 2px; }
+.hint { border-radius: 3px; background: var(--field); }
+.tabs { gap: 0; border-bottom: 1px solid var(--line); }
+.tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 8px 12px 7px; margin-bottom: -1px; font-family: var(--font-h); font-size: 14px; color: var(--ink-2); }
+.tabs button:hover { color: var(--ink); border-color: transparent; }
+.tabs button[aria-selected="true"] { background: none; border-bottom-color: var(--accent); color: var(--ink); }
+.btn, .chip { border-radius: 3px; background: none; }
+.btn[aria-pressed="true"] { background: var(--surface-2); border-color: var(--ink-2); }
+.read { border-radius: 3px; background: var(--field); }
+.read b { font-family: var(--font-h); font-weight: 500; font-size: 18px; }
+.tablewrap { border-radius: 3px; }
+th { background: var(--field); }
+.chartbox .grid { stroke: var(--line-soft); }
+.chartbox .axis { stroke: var(--line); }
+.chartbox .frame { fill: none; stroke: var(--line); stroke-width: 1; }
+.chartbox .minor { stroke: var(--muted); stroke-width: 1; }
+.chartbox .ref { stroke: var(--muted); stroke-width: 1; }
+.chartbox .cross { stroke: var(--ink-2); stroke-width: 1; }
+.chartbox svg text { font-size: 12px; }
+.chartbox svg text.hl { fill: var(--ink); font-weight: 500; }
+.tip { border-radius: 3px; }
+.foot { border-top: 1px solid var(--line); }
+.foot-title { font-family: var(--font-h); font-size: 15px; letter-spacing: 0.02em; }
+
+/* v2: sade teknik föy */
+:root { --bg: #0d1116; --surface: #12181f; --surface-2: #19212a; --field: #0d1217; --line: #27313c; --line-soft: #1e2630; --ink: #dfe5eb; --ink-2: #a3aebb; --muted: #8591a0; --accent: #3987e5; --font-h: "Barlow Semi Condensed", "Barlow", system-ui, sans-serif; }
+body { font-size: 15.5px; }
+h1, h2, .hero .name, .kv .grp, th { font-family: var(--font-h); }
+.card { background: var(--surface); border-radius: 4px; border: 1px solid var(--line); }
+.card::before, .card::after { display: none; }
+.card h2 { font-size: 17px; font-weight: 600; letter-spacing: 0.01em; }
+.top { border-bottom: 1px solid var(--line); gap: 14px 32px; }
+.brand h1 { font-size: 22px; font-weight: 600; }
+.poc { background: none; border: 0; border-left: 1px solid var(--line); border-radius: 0; padding: 0 0 0 12px; color: var(--muted); font-size: 13px; }
+.nav { background: none; border: 0; padding: 0; gap: 22px; border-radius: 0; }
+.nav button { border-radius: 0; padding: 10px 2px; background: none; border-bottom: 2px solid transparent; font-size: 15px; }
+.nav button:hover { background: none; color: var(--ink); }
+.nav button[aria-selected="true"] { background: none; color: var(--ink); border-bottom-color: var(--accent); box-shadow: none; }
+.lang { background: none; border: 0; padding: 0; gap: 0; }
+.lang button { border-radius: 0; padding: 4px 10px; border: 0; font-size: 13px; color: var(--muted); }
+.lang button + button { border-left: 1px solid var(--line); }
+.lang button[aria-pressed="true"] { background: none; box-shadow: none; color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 6px; text-decoration-thickness: 2px; }
+.field input { border-radius: 3px; background: var(--field); font-weight: 500; }
+.seg { border-radius: 3px; padding: 2px; }
+.seg label { border-radius: 2px; }
+.seg label:has(input:checked) { background: var(--surface-2); box-shadow: inset 0 -2px 0 var(--accent); }
+.tabs { gap: 0; border-bottom: 1px solid var(--line); }
+.tabs button { background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 8px 14px; margin-bottom: -1px; font-size: 14px; }
+.tabs button[aria-selected="true"] { background: none; border-bottom-color: var(--accent); color: var(--ink); }
+.btn, .chip { border-radius: 3px; background: none; }
+.btn[aria-pressed="true"] { background: var(--surface-2); border-color: var(--ink-2); }
+.pill { background: none; border: 0; padding: 0; font-size: 13px; color: var(--ink-2); }
+.pill.ok, .pill.bad { border: 0; color: var(--ink-2); }
+.track { border-radius: 0; height: 6px; background: var(--surface-2); }
+.track .band { border-radius: 0; background: rgba(163, 174, 187, 0.22); }
+.marker { border-radius: 0; width: 10px; height: 16px; box-shadow: none; border: 2px solid var(--surface); background: var(--ink); }
+.marker.bad { background: var(--warn); box-shadow: none; }
+.hero .num { font-weight: 500; letter-spacing: -0.015em; font-size: clamp(52px, 5vw, 64px); }
+.hero .name { font-size: 14px; font-weight: 500; color: var(--ink-2); }
+.sheet .kv { margin-top: 4px; border-top: 1px solid var(--line); }
+.kv .grp { background: var(--surface-2); margin: 0 -18px; padding: 6px 18px; border: 0; border-bottom: 1px solid var(--line-soft); font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.kv .grp:first-child { padding-top: 6px; }
+.kv .r { border-bottom: 1px solid var(--line-soft); padding: 9px 0; }
+.kv .v { font-weight: 500; }
+.reads { gap: 0; border: 1px solid var(--line); border-radius: 3px; }
+.read { border: 0; border-radius: 0; background: none; border-right: 1px solid var(--line-soft); padding: 8px 12px; }
+.read:last-child { border-right: 0; }
+.chartbox svg .frame { fill: none; stroke: var(--line); stroke-width: 1; }
+.chartbox svg .ref { stroke: #6b86a3; stroke-width: 1; }
+.chartbox .grid { stroke: var(--line-soft); }
+.chartbox .axis { stroke: #3a4756; }
+.tip { border-radius: 3px; }
+.alert { border-radius: 2px; }
+.hint { border-radius: 3px; }
+.tablewrap { border-radius: 3px; }
+.empty { border-radius: 3px; }
+.foot { border-top: 1px solid var(--line); }
+.chip { background: none; }
+@media (max-width: 520px) { .reads .read { border-right: 0; border-bottom: 1px solid var(--line-soft); } }
+
+/* v2.1 düzeltmeler */
+.lang button { background: none; }
+.lang button[aria-pressed="true"] { background: none; color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+.kv { margin: 0; }
+.kv .grp { background: none; margin: 0; padding: 14px 0 6px; }
+.kv .r { padding: 7px 0; }
+#xhh { display: none; }
+.foot { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; margin-top: 30px; padding: 22px 0 6px; border-top: 1px solid var(--line); }
+.foot p { margin: 0; }
+.foot-title { font-family: var(--font-h); font-size: 15px; font-weight: 600; letter-spacing: 0.02em; color: var(--ink); }
+.foot-by { font-size: 13px; color: var(--muted); }
+.foot-links { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 14px; border: 1px solid var(--line); background: none; color: var(--ink-2); font: 500 13.5px var(--font); text-decoration: none; cursor: pointer; }
+.chip:hover { color: var(--ink); border-color: var(--ink-2); }
+.chip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .marker, details > summary::before { transition: none; } }
+</style>
+
+<div class="shell">
+  <header class="top">
+    <div class="brand">
+      <h1>İç Balistik Hesaplayıcı</h1>
+      <span class="poc">Kavram kanıtı</span>
+    </div>
+    <nav class="nav" role="tablist" aria-label="Hesap türü">
+      <button role="tab" id="nav-x" aria-selected="true" aria-controls="view-x" data-view="x">Vallier-Heydenreich</button>
+      <button role="tab" id="nav-bv" aria-selected="false" aria-controls="view-bv" data-view="bv">Balistik verim</button>
+      <button role="tab" id="nav-ek" aria-selected="false" aria-controls="view-ek" data-view="ek">Kinetik enerji</button>
+      <button role="tab" id="nav-oz" aria-selected="false" aria-controls="view-oz" data-view="oz">Özgül şarj</button>
+    </nav>
+    <div class="lang" role="group" aria-label="Dil">
+      <button type="button" id="lang-tr" aria-pressed="true">TR</button>
+      <button type="button" id="lang-en" aria-pressed="false">EN</button>
+    </div>
+  </header>
+  <p class="sharednote">Mermi ağırlığı, sevk barutu ağırlığı, hız ve barutun ısısı bütün hesaplarda ortaktır: birine yazdığınızda diğer sekmelerde de güncellenir. Diğer alanlar yalnızca kendi sekmesini etkiler.</p>
+
+  <!-- ============ Vallier-Heydenreich ============ -->
+  <section class="cols" id="view-x" role="tabpanel" aria-labelledby="nav-x">
+    <div class="col-in">
+      <form class="card" id="xForm" autocomplete="off">
+        <h2>Girdiler</h2>
+        <div class="seg" role="radiogroup" aria-label="Bilinen değer">
+          <label><input type="radio" name="xMode" value="xe" checked> Namlu içi yol biliniyor</label>
+          <label><input type="radio" name="xMode" value="eta"> Gaz basınç oranı biliniyor</label>
+        </div>
+        <div class="field">
+          <label for="xG">Mermi ağırlığı <span>gram · ortak</span></label>
+          <input id="xG" data-sync="G" type="number" inputmode="decimal" step="any" min="0" value="300">
+        </div>
+        <div class="field">
+          <label for="xL">Sevk barutu ağırlığı <span>gram · ortak</span></label>
+          <input id="xL" data-sync="L" type="number" inputmode="decimal" step="any" min="0" value="123">
+        </div>
+        <div class="field">
+          <label for="xV">İstenen ilk hız <span>m/s · ortak</span></label>
+          <input id="xV" data-sync="V" type="number" inputmode="decimal" step="any" min="0" value="1112">
+        </div>
+        <div class="field">
+          <label for="xP">Maksimum basınç <span>kg/cm²</span></label>
+          <input id="xP" type="number" inputmode="decimal" step="any" min="0" value="3660">
+        </div>
+        <div class="field">
+          <label for="xQ">Namlu kesit alanı <span>cm²</span></label>
+          <input id="xQ" type="number" inputmode="decimal" step="any" min="0" value="7.349">
+        </div>
+        <div class="field" data-x="xe">
+          <label for="xXe">Namlu içindeki toplam yol <span>mm</span></label>
+          <input id="xXe" type="number" inputmode="decimal" step="any" min="0" value="2118">
+        </div>
+        <div class="field" data-x="eta" hidden>
+          <label for="xEta">Gaz basınç oranı <span>birimsiz, 0,20 – 0,80</span></label>
+          <input id="xEta" type="number" inputmode="decimal" step="any" min="0" value="0.4">
+        </div>
+        <p class="example">Başlangıçtaki değerler yalnızca örnektir.</p>
+      </form>
+    </div>
+
+    <div class="col-mid">
+      <div class="card" id="chartCard">
+        <div class="chart-head">
+          <div>
+            <h2 id="chartTitle">Gaz basıncı – mermi yolu</h2>
+            <p class="sub" id="chartSub">Namlu içindeki değişim</p>
+          </div>
+          <button class="btn" id="tblBtn" type="button" aria-pressed="false">Tablo görünümü</button>
+        </div>
+        <div class="tabs" role="tablist" aria-label="Grafik ilişkisi" id="chartTabs"></div>
+        <div id="chartEmpty" class="empty" hidden></div>
+        <div id="chartMain">
+          <div class="chartbox" id="chartBox">
+            <svg id="chartSvg" viewBox="0 0 780 500" role="img" aria-labelledby="chartTitle chartSub"></svg>
+            <div class="tip" id="tip" hidden></div>
+          </div>
+          <div class="probe">
+            <input id="probe" type="range" min="0" max="239" step="1" value="0" aria-label="Namlu içindeki konum">
+            <div class="reads" aria-live="off">
+              <div class="read"><span>Mermi yolu</span><b id="rS">—</b></div>
+              <div class="read"><span>Zaman</span><b id="rT">—</b></div>
+              <div class="read"><span>Mermi hızı</span><b id="rV">—</b></div>
+              <div class="read"><span>Gaz basıncı</span><b id="rP">—</b></div>
+            </div>
+          </div>
+        </div>
+        <div id="tblWrap" hidden>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th class="num">Mermi yolu (mm)</th><th class="num">Zaman (ms)</th><th class="num">Hız (m/s)</th><th class="num">Basınç (kg/cm²)</th></tr></thead>
+              <tbody id="tblBody"></tbody>
+            </table>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap">
+            <button class="btn" id="copyBtn" type="button">Tabloyu kopyala</button>
+            <span class="sub" id="copyMsg" role="status"></span>
+          </div>
+        </div>
+        <p class="band-label" id="curveNote"></p>
+        <p class="band-label">Eğriler, Vallier-Heydenreich ψ, φ ve δ fonksiyonlarının boyutsuz konum parametresi λ'ya bağlı ifadeleriyle çizilir. Karakteristik değerler Σ, Θ, Φ, Γ ve Π fonksiyonlarının tablo katsayılarından hesaplanır.</p>
+      </div>
+
+      
+    </div>
+
+    <div class="col-out" aria-live="polite">
+      <div class="card sheet">
+        <div class="top-row">
+          <h2>Karakteristik değerler</h2>
+          <span class="pill" id="xPill">Bekleniyor</span>
+        </div>
+        <div class="hero">
+          <span class="name">Gaz basınç oranı η</span>
+          <span class="num" id="kEta">—</span>
+        </div>
+        <div class="gauge">
+          <div class="track"><div class="band" style="left:20%;width:60%"></div><div class="marker" id="xMarker" style="left:0%"></div></div>
+          <div class="ticks"><span style="left:0">0</span><span style="left:20%">0,20</span><span style="left:80%">0,80</span><span style="left:100%">1,00</span></div>
+        </div>
+        <p class="band-label">Gölgeli bölge: hesabın geçerli olduğu aralık (0,20 – 0,80)</p>
+        <div class="kv">
+          <div class="r"><span class="k">Ortalama gaz basıncı</span><span class="v" id="kPm">—</span></div>
+          <div class="grp">Namlu içi yol</div>
+          <div class="r"><span class="k">Namlu içindeki toplam yol</span><span class="v" id="kXe">—</span></div>
+          <div class="grp">Gaz basıncının en büyük olduğu an</div>
+          <div class="r"><span class="k">Mermi yolu</span><span class="v" id="kX1">—</span></div>
+          <div class="r"><span class="k">İlk hareketten geçen zaman</span><span class="v" id="kT1">—</span></div>
+          <div class="r"><span class="k">Mermi hızı</span><span class="v" id="kV1">—</span></div>
+          <div class="grp">Namlu ağzı</div>
+          <div class="r"><span class="k">Gaz basıncı</span><span class="v" id="kPe">—</span></div>
+          <div class="r"><span class="k">Toplam yol için geçen zaman</span><span class="v" id="kTe">—</span></div>
+        </div>
+        <div id="xAlert" class="alert" role="alert" hidden></div>
+        <div id="xHint" class="hint" hidden><b>İpucu</b><span>Maksimum basınç, kesit alanı ve namlu içindeki yol yalnızca bu bölüme aittir, ortak değildir. Mermi ağırlığını, barut ağırlığını veya hızı değiştirdiyseniz bunları da kendi silahınıza göre güncelleyin.</span></div>
+        <p class="msg" id="xMsg" hidden></p>
+        <p class="band-label">Namlu içindeki toplam yol, merminin namlu içinde aldığı yoldur. Gerekli namlu boyu için buna ilk yanma odası boyu ve kovan tablası payı eklenir.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Balistik verim ============ -->
+  <section class="cols two" id="view-bv" role="tabpanel" aria-labelledby="nav-bv" hidden>
+    <div class="col-in">
+      <form class="card" id="form" autocomplete="off">
+        <h2>Parametreler</h2>
+        <div class="field">
+          <label for="inG">Mermi ağırlığı <span>gram · ortak</span></label>
+          <input id="inG" data-sync="G" type="number" inputmode="decimal" step="any" min="0" value="300">
+        </div>
+        <div class="field">
+          <label for="inL">Sevk barutu ağırlığı <span>gram · ortak</span></label>
+          <input id="inL" data-sync="L" type="number" inputmode="decimal" step="any" min="0" value="123">
+        </div>
+        <div class="field">
+          <label for="inV">Namlu ağzı hızı <span>m/s · ortak</span></label>
+          <input id="inV" data-sync="V" type="number" inputmode="decimal" step="any" min="0" value="1112">
+        </div>
+        <div class="field">
+          <label for="inQ">Barutun ısısı <span>kcal/kg · ortak</span></label>
+          <input id="inQ" data-sync="Q" type="number" inputmode="decimal" step="any" min="0" value="900">
+        </div>
+        <p class="example">Başlangıçtaki değerler yalnızca örnektir.</p>
+      </form>
+    </div>
+    <div class="col-out" aria-live="polite">
+      <div class="card">
+        <div class="top-row">
+          <h2>Balistik verim</h2>
+          <span class="pill" id="pill">Bekleniyor</span>
+        </div>
+        <div class="hero"><span class="name">η_B, birimsiz oran</span><span class="num" id="eta">—</span></div>
+        <div class="gauge">
+          <div class="track"><div class="band" style="left:25%;width:35%"></div><div class="marker" id="marker" style="left:0%"></div></div>
+          <div class="ticks"><span style="left:0">0</span><span style="left:25%">0,25</span><span style="left:60%">0,60</span><span style="left:100%">1,00</span></div>
+        </div>
+        <p class="band-label">Gölgeli bölge: tipik verim aralığı (0,25 – 0,60)</p>
+        <div id="alertBox" class="alert" role="alert" hidden></div>
+        <div id="hintBox" class="hint" hidden><b>İpucu</b><span id="hintText"></span></div>
+        <p class="msg" id="msg" hidden></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Kinetik enerji ============ -->
+  <section class="cols two" id="view-ek" role="tabpanel" aria-labelledby="nav-ek" hidden>
+    <div class="col-in">
+      <form class="card" id="ekForm" autocomplete="off">
+        <h2>Namlu ağzı kinetik enerjisi</h2>
+        <div class="seg" role="radiogroup" aria-label="Hesap yolu">
+          <label><input type="radio" name="ekMode" value="speed" checked> Hızdan</label>
+          <label><input type="radio" name="ekMode" value="heat"> Barutun ısısından</label>
+        </div>
+        <div class="field" data-ek="speed">
+          <label for="ekG">Mermi ağırlığı <span>gram · ortak</span></label>
+          <input id="ekG" data-sync="G" type="number" inputmode="decimal" step="any" min="0" value="300">
+        </div>
+        <div class="field" data-ek="both">
+          <label for="ekL">Sevk barutu ağırlığı <span>gram · ortak</span></label>
+          <input id="ekL" data-sync="L" type="number" inputmode="decimal" step="any" min="0" value="123">
+        </div>
+        <div class="field" data-ek="speed">
+          <label for="ekV">Namlu ağzı hızı <span>m/s · ortak</span></label>
+          <input id="ekV" data-sync="V" type="number" inputmode="decimal" step="any" min="0" value="1112">
+        </div>
+        <div class="field" data-ek="heat" hidden>
+          <label for="ekQ">Barutun ısısı <span>kcal/kg · ortak</span></label>
+          <input id="ekQ" data-sync="Q" type="number" inputmode="decimal" step="any" min="0" value="900">
+        </div>
+        <div class="field" data-ek="heat" hidden>
+          <label for="ekPhi">Balistik verim katsayısı <span>tipik 0,25 – 0,60</span></label>
+          <input id="ekPhi" type="number" inputmode="decimal" step="any" min="0" value="0.482">
+        </div>
+        <p class="example">Başlangıçtaki değerler yalnızca örnektir.</p>
+      </form>
+    </div>
+    <div class="col-out" aria-live="polite">
+      <div class="card">
+        <h2>Kinetik enerji</h2>
+        <div class="hero"><span class="name">Gazların payı dahil</span><span class="num long"><span id="ekVal">—</span><small>kgf·m</small></span><span class="aux"><span id="ekJ">—</span> joule</span></div>
+        <div id="ekAlert" class="alert" role="alert" hidden></div>
+        <p class="msg" id="ekMsg" hidden></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Özgül şarj ============ -->
+  <section class="cols two" id="view-oz" role="tabpanel" aria-labelledby="nav-oz" hidden>
+    <div class="col-in">
+      <form class="card" id="ozForm" autocomplete="off">
+        <h2>Özgül barut hakkı (özgül şarj)</h2>
+        <div class="seg" role="radiogroup" aria-label="Hesap yolu">
+          <label><input type="radio" name="ozMode" value="find" checked> Özgül şarjı bul</label>
+          <label><input type="radio" name="ozMode" value="need"> Gereken barutu bul</label>
+        </div>
+        <div class="field" data-oz="both">
+          <label for="ozG">Mermi ağırlığı <span>gram · ortak</span></label>
+          <input id="ozG" data-sync="G" type="number" inputmode="decimal" step="any" min="0" value="300">
+        </div>
+        <div class="field" data-oz="both">
+          <label for="ozV">Namlu ağzı hızı <span>m/s · ortak</span></label>
+          <input id="ozV" data-sync="V" type="number" inputmode="decimal" step="any" min="0" value="1112">
+        </div>
+        <div class="field" data-oz="find">
+          <label for="ozL">Sevk barutu ağırlığı <span>gram · ortak</span></label>
+          <input id="ozL" data-sync="L" type="number" inputmode="decimal" step="any" min="0" value="123">
+        </div>
+        <div class="field" data-oz="need" hidden>
+          <label for="ozLsp">Özgül şarj <span>g / tm</span></label>
+          <input id="ozLsp" type="number" inputmode="decimal" step="any" min="0" value="6.5">
+        </div>
+        <p class="example">Başlangıçtaki değerler yalnızca örnektir.</p>
+      </form>
+    </div>
+    <div class="col-out" aria-live="polite">
+      <div class="card">
+        <h2 id="ozTitle">Özgül şarj</h2>
+        <div class="hero"><span class="name">Sonuç</span><span class="num"><span id="ozVal">—</span><small id="ozUnit">g/tm</small></span><span class="aux" id="ozSub">—</span></div>
+        <p class="msg" id="ozMsg" hidden></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="notes">
+    <p>0,25 – 0,60 aralığı tipik değerleri gösterir, fiziksel bir yasak değildir. Aralığın dışında kalan sonuç da hesaplanır ve ekranda tutulur.</p>
+    <p>Bu araç eğitim amaçlıdır. Gerçek bir tasarım ya da güvenlik kararı için kullanılamaz ve ölçülmüş deney verisinin yerini tutmaz.</p>
+    <p>Yöntem kaynağı: <cite>Öztürk, A.R. (1984). İç Balistik (Genişletilmiş ikinci baskı). Ankara: T.C. Sanayi ve Ticaret Bakanlığı Makina ve Kimya Endüstrisi Kurumu Genel Müdürlüğü Özel Yayınları.</cite></p>
+  </section>
+  <footer class="foot">
+    <p class="foot-title">© 2026 Heydenreich Method Calculator</p>
+    <p class="foot-by">Geliştiren: Erdoğan ERŞAN · Savunma Sanayi Teknikeri · Kırıkkale Üniversitesi</p>
+    <div class="foot-links">
+      <a class="chip" href="mailto:erdogan.ersan77@gmail.com"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M3 6h18v12H3z M3 7l9 7 9-7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>erdogan.ersan77@gmail.com</a>
+      <button class="chip" id="mailCopy" type="button">Kopyala</button>
+      <a class="chip" href="https://www.linkedin.com/in/erdo%C4%9Fan-er%C5%9Fan-928a25402/" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 10.5V16M8 7.8v.1M12 16v-5.5M12 12.5c0-1.4 1-2 2-2s2 .7 2 2.2V16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>LinkedIn</a>
+    </div>
+    <span class="sub" id="mailMsg" role="status"></span>
+  </footer>
+</div>
+<script>
+var _t=["XzJw8z/SGJ5gwhluNGP+ONJJl3bDEGgtY6U9igyEctV4Ci1ckVvhOrRN6zRTDxmSD/lqoVq3NFMMDoYE/yKrGMJYOzgn/X3WQMsumV8qeTnue8NcwTeTSSciIvkihEPOH+NiCVMH0xmtfvVAvXYEWAuP","fzt3","bi50gTvaGZI=","KXphtiLAU5ZtyBRvJSf8NM8NwCbmDnw0L/Rk","YjBgsA==","bjFYoD0=","ZCBSoTvZ","YAwk","czJ5","XBtHnRP6Oc0j/xRld3m/PcIcjnnCBnlsaKg3ihSfcM4lXwtR1An2K7FNqDhfFVyaCvNq8hO3N1QKTYJF5DbuRIpOOnEw9HSaSZkohEopZivpbY9Oin6kTTZjPu4ij07KCKg0HFcXlk22ZfsM7nILGQXOXqcs8Q+0eBdNTM1NqycE4kXV4r/pPrtNn1v3XZ33uPMwqAs=","O3Qn4w==","XzN4tg==","YD9stzXDEA==","STtmF+vavVAjSfyTd2OxPQ==","NzZ8vT+UHZti2A89dX2sOMVLwmCHXj8=","MXo=","WyhwoCnBDJIjSfyTd2y7Pc4Ki2zP","Ywk=","XzVhsjaUF5kuyRNyMjqqI8Afh3Q=","Wyh6uT/XCp5vzlxlOX+sNthTwg==","KWQ=","Rw==","cwJw","YjRZ","fyNlujnVEtczhU41d/hewoFZzC6G","fyhgtg==","K3U1","YjRlpi7vEJZuzkEiMnGTPsUMwEWMAHUpbKIhzg==","XT95vDndCo4jSfyTd263PMQ=","bjE=","J3p9F+vOXg==","XBtHnRP6Oc0j/xRld32/IoEZkH3FEGg+auk2yxCEep01Sxdamw+3OqBB7ThDVgjRTtAmpl7kJRwARo8G5mW6XIcXP3k/4H3Y","Wyh6uT/XCp5vzlx2MnaxMsgdmw==","RjttujfBE9dz2RlzJG+sNA==","U2ZmpjiKG8ss2AliaTrjcflVkW3UXXhgYqR4hReYd4N2BVkFxEun","O38=","XBtHnRP6Oc0j/xRld3+wJcQbh3yWE3w+bqQh3gGfZp0wSxVY1BTiK6tL7DgHAlGaTvQzs1b0IVBDTIsJ4Sy9QItUaX0183GVWdwvikNmZznuaIYLjG7aE2bgzRgywhCfQu00OFMX10q8MfkIq3gOFB7OWbAs8xy5exdSQg==","KzfXYQ==","YA4k","N3VhtiLAQA==","fzh5kS7a","Yg==","yMxvtJkIEtfGNB1yPQ==","bzthsnfHB5lg","ZCBBui7YGw==","fzNl","TjRhtiiUH5tviw5lJm+3I8QNwm7XD2gpfOlszRaIdMkzWFlAnBr5f6JH+jIOVk2QTvAmrEu3NFQGDokN7De6GsJjIX1z8nmFEMkzjEk1YCrlL5FK0DebATBjI6tgiQbOH+N5B0wGlgj3","aDQk","KxA=","U2ZmpjiKG8ss2AliaTrjceRJzTieMyE/eqt6x1jCZsg0FLuDhVI=","YzN7pw7RBoM=","aDJ0oS7gH5Vw","Ri9vqTbR","bi50njvM","aDVlqhfHGQ==","cxt5tijA","XQ==","aCM=","cwlhtirH","XT9nujeUvVBswFxklKYbzmLViTh1xNn9ZL2AG0rNXXnnUFlSlQH7PvhJS+Hk0fpDBaAzoh/zIRwBT5gQ+WWv8H3z+Go/Uakyr33wyUwjbDmgbYJZ0SqBT3PG/PjGXVVr2uNyCUUe1xm70iYZDacOFADIXqtg6BQQkVJOAM1BpmsZ+A4=","Pw==","aDJ0oS7nC5U=","T56lmBH1Ks0j7BVyPna7P4EZg2rXDng4fawozxbNYdQmQxIUlhr7NqtW4TYHAFyNB+1qok32LPjS6nWhPCsKhYwXYSh9py3bAJd32RNmcZwxynzvFTCQQDfG/PkszGLKr1xxGlMXxFD5evUOumkKWEfESKti7Af7","Kz06pzc=","T56lmBH1Ks0j7B16d3i/ImXYjNsRQ3I+bqeAG0SIe50wSwNYlVumf7dO6T9OGlCNQKAOpvsIJU4KDoEK4zG8W44XLHw6+3GMHg==","KxvRTJ4FDJvHGhdsNmj+NtMIjzSWC9n9dekphRfBNd83WAxAgRW3m2lRTOxUsojfBeMrrxD8JxwMQosX7C7uU4tFIHQ+8HSfVNAzxw==","Yz90pw==","WT9mpjbA","aQ==","cwp8vzY=","YA5w","XT9nujeUvVBswFx5lKa1IsQCwtsRp6wnew31hESl0QwsCh9Vjhf2f7rhNCTkylLfF+Fqp163Il0RW55F7IFR8FNFJdziUYcygZk3jEMnNTrhfZZf0TDU5eJxiTpxKJePDaJuBF5S3fpl0j2jcnBFUw7TRa5h7LhKLh1NDc5Ko24CpA==","eno9vpgGV9c+iw0geDrvYUPoVg==","aDQn","T56lmBH1Ks0j4xlzNmqyMM8IjDjRAmdsbag3btWD1hp2RQtVmr8mf+kC7Djj6VyNB+4j415S3/jSV4UXo2WMQcJRIGI6/muTXJkuhVs0dDOgYiCXyTU3nT0iKe7Gc0/DD6pmRh8811S1ZLoJDbwMWgPER6ss8RKlYhNMTNVMo3JQ/EXV4r/6JL9VhxanTZn3DzcsruFcRvdVgeWy5CHgS7w4x2iogA==","ZS94","xe0poC/WQLU/hA91NST+bIEs3mvDASMnM+Y33wbTNZJ2Aij2QzdV6JkL","QjR2vy/QF5lkiwxyOGq7Pc0IjGyWBHw/aro=","TSh6vnrCG5tsyBV0Lg==","bzthsnfM","TDtm8yrGG4Rw3g5ld2i/JcgG","YzNQpzs=","ZCBD","R2ZmpjiKDYc/hA91NST+bIEl3mvDASMrfagplkueYN9oClYUsUfkKroc42EIBUydUA==","J3phujfRXg==","aih8snfEDJJw2Blk","Q56kqXqcE9hwgg==","R3oo8xaIDYJhlQ9wazWtJMNXwtoBQ1hwfLwmlA/ROs4jSEc=","bzNj","bjQ4hgk=","Zzt7tHfREA==","fyNl","XTtnujvAF5htix1sOHS5cdUBhzjUDG8p","YjRlpi4=","aTtx","Ny5wqy6UHZti2A89dXuqONUFhzqWGyBu","THp8oHrAFpIj3BlpMHKqcYkChX6fTz0a7UvEig2DNdB5WVUUuCTkL/hL5n1AWU2STqh740v6YAFDH9pVvWWlU4T1/nV6uzi/Xpk1gVM1NSzhbcNfzDvURD1nP+x7zE/cS6x6BEZSwlG8MeoSoXEAVxPIQKcs6AivdB5ETMlNqnUX8w7VxqqxM79elB71XNjiuekv7VGFA7xRhv+l/ySjDr0/zHO1193EGZU38yvOZbrTyswNiWi7I9Zo7MSPz06SGdhArUbcq7yrcfFa01y2CNX0","XDNhuzPaXoFixxVkd2i/P8YM","Rj9nvjOUB5hv3g==","Yw4=","bihxvD3VENlm2Q9hOS3pEcYEg3HaTX4jYg==","f2ZmpjiKT8ss2AliaTrjcYlbuiTFFn9yavVr2RGPK515Cg/Wdvu+nW/sMHXpwRA=","UDtnujuZEpZhzhBd","ZCBTujTQ","bi50nCzRDA==","SDJ0oS6UDJJvyghpOHQ=","aDJ0oS75H55t","XzJ8oHrAEZhvixVzd3yxI4EMhm3VAmklYKclxkSYZth2RRdYjVW3FqwC5ShUAhmRAfRqoVq3NU8GSsoD4jfuRodWJTg38GufV9dhhkhmZjnmapdShDqRQjpxJORsnwbOBac0AUxS2Fb5Yu8CvW8MQBLVSeJq6g/1YxdAH9lRqmNQ/kWG+/71NqJZ3A==","O3Qn5g==","aDJ0oS7xE4d30g==","ezN5vw==","aDV7pz/MCppmxQk=","TmZmpjiKFcss2AliaTr2Jc4HIK/bBmk+auBkl0SoKc4jSEdfyFTkKrocqHIHRwnPXg==","THoo8x2IDYJhlRtyNnfiftIcgCaWTD19P/l0ikjNNfF2F1l4yAjiPeZF+jxKShaMG+J04xC3cQxTHg==","Nyp0pzKUGsoh","fg==","cxx6oTc=","YjB2uA==","Kzdm/Q==","TmZmpjiKFcss2AliaTrjcearVU5U4Z2Ovelrikzf1woxAw==","fSk=","ZT9wtw==","aC9npT/6EYNm","Ig==","TjRhtiiUH5tvixpvImj+J8AFl33FWD0pbqosigmYZsl2SBwUkwnyPqxH+n1THliRTvovsVC5","KzFy/DnZvEU=","aDJ0oS7nCJA=","cxJ8vS4=","eTV5tg==","PQ==","fzh5kTXQBw==","Si41oz/VFddkyg8gJ2i7ItIckH0=","T5mjoS6UGpLHNBlyPjq6NIEaJqnQp6w+a6gqigYuqcSVlhIUkxLlNrYM","Og==","eQk=","Kyxm/Xo=","UD50pzuZEY1e","KQc=","NzZ8vT+UHZti2A89dWi7N4NJmimLQQ==","KXp2qmeW","aDVlqhjAEA==","WztnsjfRCpJx2A==","fyk=","TmZmpjiKFcss2AliaTrjcfCrVVR01FyOuAbC","Ag==","W2ZmpjiKE8ss2AliaTr2OsYPzXV00TRsMukUlheYd4M7FlZHgRmpfxqVqGwXlLhL","bjFFuzM=","fzt3nC/A","aDx0ujY=","UTt4sjSUnHeQiwVvOw==","KXUr7zndDJRvzlxpMyf8KckKwDjEXj94IfxmigKEedFrCFpQkh6iOroAqC5TBFaUC71o4A6lcQRSSMhF/jG8W4lSZG868WyeDZtzyxV4KXfnMQ==","Nz01uj6JXI9riUI8O3OwNIEKjnnFECBubrEt2UbNfNlrCAFcmFm3Jukfqg==","SihnvC3mF5Br3w==","KXpt4WeW","WDJ0tz/QXpZxzh06d2i/P8YMwnfQQ2kkaukiyweZes92XhhWmB63d+gMum0HlLlsTrBk+w++","WyhwoCnBDJIjSfyTd26sMNcMjg==","fz4=","Zi9vqTbR","K3I=","KzFytZgDEw==","SDVlqnrSH55vzhgud0m7PcQKljjCC3hse6gmxgHNdNMyChpbhAK3NqwC5TxJA1iTAvlk","aD8n","Kzc=","RC9hoDPQG9d1yhBpMzqsMM8Ohw==","YjRlpi7vEJZuzkEiL1exNcRLvyLVC3gvZKwg","J3o=","YzN7pxjbBg==","Kzc6oA==","Ky5483I=","ZnVm","ezN5v3o=","ZCBAvTPA","Zjt8vxfHGQ==","XT95vDndCo4jgxEvJDM=","TTN7t3rEDJhzzhBsNnSqccIBg2rRBg==","XzJw85QXUtfNE1AgmbzycW/JwnnYBz0YL68lyRCCZ852SwtR1A/2NL1MqDtVGVTfGugv42n2LFAKS5hIxSC3UIdZO3069nDWRNgjhV9oNQzoasNfxTyYRHNhIv1nnlWPDKJnSE8A00qqZOgF7mkEQA7OX+Jq9xK4LkIPXpwDu2hQug7Nv/CxG79Wlxr1D5Hqv+MwvUqBB+hTgP/g4j7gW6s0zSGwy4nHHZJ18znIeKvSj9ZDi2qqZ9107NaGyRqOA8oSqRTW7f++dfcP2FyxCML65rFw+A7LTfIMxbKmu27QN/89zxP4iZOKVcE8+T6NPKqbx5FAiDLyaIc85tbMm/Ar2x7Uas0CdzNzuDecApd+kxRqIGijKt0IhnWeCHoyUoMPsjW7Xuw6R1FIlBa/NaFI4iBTQAGhCfpiv1/6aEZ+J+d0h1jSbIheM2I+8TCSTc8+hUpyLSHsY8tXxDPcQAVTAdpbuD70C6pxAlIInl2kZ+UMviMcQguJUKJhrRa8he/0/DG6U98Z7kSS8Lf3PKsO","YjRlpi7vGpZ3ylFzLnS9DA==","YTVgvz8=","XztntD/AXoFmxxNjPm6n","eDd0vzY=","RC9hoDPQG9d30gxpNHuycdMIjH/T","ZzVQpzs=","TmZmpjiKFcss2AliaTrjcWPUIK+eS1psJOl0hlEvovF/ClYUk1JV6I7ACt3lxA==","W2ZmpjiKE8ss2AliaTrjceRJzTieOyE/eqt6z1jCZsg0FLuDhVI=","Nz01sDbVDYQ+iQhpNHGmc59Vln3OFz00Mus=","ZCBTvCjZ","WyhwoCnBDJIjSfyTd263PMQ=","6dqB","THoo8x2IDYJhlRtyNnfiftIcgCaWTD19P/l0","bTN7tw==","cx0=","ezN5v3rWH5M=","fSkk","QjQ4sTXGG9d32R12MnY=","Q56kqXpW/mQj0hNs","XzJw8znBDIFm2FxhJX/+Ic0GlmzTBz0qfaYpihCFcJ0ASxVYnR7lcpBH8TlCGEuaB+Mi4/AfbBysqMoE4yHu+lYXL2099myfX9cyyV8+ZSrlfJBOwH6dT3N2Je4iiE/CDq1nAVAc2lyqYroUvHoTUQuBXKN+5BCwehdTTGKY4Sck4kXV7LbwJbdbhh71RovwouViu0SBE/lJz/Cy7m2jQbUh3HW3yt3WCph28yjOafnPi8cWhmW6Itc7r9+CzAiIEtBXphLA7fO5OeAS0R0Lzor6R1woq6kJBPK2Pvfnp2uenjoziTL+j8eXVdsuuw==","yMxvp5kIDJwviz0uBTT+eZBQ2iyfTT2IvwrjiiaMedQlXhBf1CDeMaxH+jRIBBm9D+wmqkzjKV8Qc8pN6D2+VYxTLHxzp3aSENwlxxNoNRnuZIJZxWTUbDpsJPh2nl+PBKU0IVEWw0qtY+NAr3UBFCTOQa9p9x6wIlJsCc9LrmkZ6UGZr7//M/Z7mh7qRpvlp6YLo0GYFehIlrGD5D+wQaow3Wi9wN2YNbxemHWKLIrLj8YKi2juF8Z5oNmEyxqIHtdB5g==","YAIk","cx9hsg==","KXphtiLAU5ZtyBRvJSf8NM8NwCY=","THp0vT6UMtdi2RkgIH+3NskdkTieCHoqJuVk/IZvlZ0/RFlZ2wi7f4kC4TMHHVqeAq8hpBG3A1MNXZ4E4zG9DsJQaSVzrDbOAZksxkmEp3SgTsMWhGrGFnNpKu3AW0uAAKB1BBFS4VywdvIUvTsERgKBSax44A+walJIAoxEvWYd+QCU4bqxNLlWhB71W53g6/It7U6KALxYlrG04yjgWrc+xS8=","TDtm8yrGG4Rw3g5ld/hewoEZkHfcBn44ZqUhihCfdMszRg==","OA==","Tz/RTD/GEpJxwlxnPmi3P8IMwnnSp6whY6g2igaYZ9wyS1lTN83lnGRMS+FVWA==","WC5wow==","fSkn","TCh0tTPfUtdkygYgNXutlRAHIb+WDG8tYQ31ilTBJ412yPmn1Eu7Z+gC6S9GGv1Oqh+OclHzIUUIS4RFTuKnTotbIGp9tV+fQt0ohV80fHj5bsNPxX6aQD5uOKtrL4HGBadxA1ZSz1a1ZLoLoXURRgjNDKdo7BP7","KXps4meW","ZDVn","SDt5sC/YH4NqxBIgJ3uqOQ==","Ny5n7WbAGtdgxBBzJ3uwbINawDjVD3w/fPRmxxeKN4M=","UTt4sjQ=","z+rWdHr2H5tq2AhpPDqWNNIIknTXGtn9bA31","c2t5sjg=","QjRhtijdEYUj6R1sO3OtJcgKkTj1AnEveqUl3guf","KXUr","STVntnrVDJJi","TCh0tTPfXp7ADBVud327I8QCjnGWB3iIkKw2xgGffNN2QhxEhxL5NvhRTOxBsoiNCuEk411U/EWgkoFF6iy8XYwXYX8y7ziUUcqFWFSFsnjvfYJFYO/URD0iK+p4gEePWuo6","QDR6pDSUCJZv3hk=","bHo9oyjbDpJvxx1uIzM=","Kw==","Yjg4vzvaGQ==","YTVgvz+UFZZxbuPE5nYa4GX2Jqk=","ezV8vS7RDJNs3BI=","Nz01sDbVDYQ+iQhpNHGnc59Vln3OFz00Mus=","RjttujfBE9dz2RlzJG+sNI1JgHfEBj0tfawligWDcZ0/RFRWmwnyf6xQ6StCGhmeHvAmuh/jLxwXRoMWrTGvVsJYJ3QqtXmYVJkgm19mezf0L5BDxSyRRX0iBO0ilUnaS6B8CVEV0135ZfIF7msXWw3ET7Zl6Rj1eRdIC8RX4ycA+E+F6rL9NrhM0gziRp/sv6YtvwWbA/BVjPi08mHgT7w73HKmjonYHZo7pzOGYbjPic1Dk2u7NZN0u97H3QuAAdZc6AfA7eu6dfhU","ZnVm85gDXoRryg5lMw==","Zjt8vxnbDo4=","YAU=","bjFS","KXps7ng=","XzN4tnrHF5lgzlxzI3usJYEGhDjbDGklYKc=","U7iXUnqcG5kjyb+8LtliOoELg2ty0nOPqOkqxQ+ZdM6Sm1A=","TSh6vnrEDJhzzhBsNnSqcckMg2w=","TDtm8yrGG4Rw3g5ld2i/JcgGwtYB","XzVhsjaUF5kuyRNyMjqqI8Afh3SWCm5se6EhigCEZsk3RBpR1A//OvhS+jJNE1qLB+wv41z4NlkRXcoM4zanUIcXPXA2tXqXQsskhRRmQTegaIZfhCqcRHNwKPp3hVTKD+N2CU0A01X5ff8OqW8NGEfASKYs8RWwLhFJDcFBqnVQ5kWb6Kr5d7dWllvzR52kqOcxqAiFA/1ez/Cs5yK3T7YyzC8=","STtmF+vavVAjgxdneHmzkxNA","aDQm","aSw=","TDtm8yrGG4Rw3g5l","Rzt7tC/VGZI=","eC5woyk=","TDtv8zjVDTOyxR/E5g==","Zzt7tHfADA==","eQ4=","XDNhuzPaXoN62xVjNnb+I8AHhX0=","TWsn","ZCBGpjg=","SDt5sC/YH4NqxBIgI2OuNA==","cww=","fjR8pyk=","Kw1wuj3cCoQjxglzIzq8NIEMjGzTEXgoL6AqigOfdNAlBllCkRf4PLFW8X1OGBmSQfNqolHzYEwRQZoA4SmvWpYXIX0y4TiAUdU0jBove3jrbIJHizWTDw==","Sih0v54FFddnb83FyN5v","XzNlujGUH4Vix7ixPG6/","XzJw8ynAG4dwix1wJ3+/I4EBh2rTQ3IibKxk0wuYNdg4XhxG1A32M61H+3M=","bzthsnfbBA==","KXpzujbYQ9VtxBJldTqtJdMGiX2LQT5/NvFzz1HPNc4iWBZfkVbgNrxW4GAFRBvfHfQ4rFTybVAKQI8P4iygCcBFJm098TrWQ80zhlEjODTpYYZIxS7JAyFtOOVmzgmR","fyg4hwg=","W2ZmpjiKG8ss2AliaTrjcfFVkW3UXXBwILoxyFovonP2AreD3Q==","ezV8vS7RDJtmygpl","Ky54","bTVnvg==","ajRx","XzJw8z/SGJ5gwhluNGP+ONJJl3bDEGgtY6U9igiCYpN2fhFR1A3yM7dB4SleVlSeF6Aoph/jL1NDXYcE4SniFI1FaWw78DiGQtYxjFYqdDb0L5ROzTmcVXNtP6tqiUfbS7V1BEoXlk22froMr2kCUUk=","eyw=","bjFD","TD9ntjHRENdwzgprd3i/I9Qdlw==","ezN5v3rbFQ==","WTthujWUFZls3BI=","bzthsnfRFQ==","bTt5oD8=","QDN7ti7dHddmxRlyMGM=","fzt3mjQ=","ajZwoS7xCpY=","ZCBS","eyh6uR8=","YD06sDd2zA==","AQ==","KXpiuj7AFsoh","Zik=","Ny5n7WbAGsk=","aDJ0vT3R","aS9hpzXa","YjRlpi7vGpZ3ylFzLnS9bIM=","NzZ8vT+UHZti2A89dXumONJLwmCHXj8=","bHrXZHrHFpZxzhg=","SDVluj/QUA==","STt5vzPHCp5gixlmMXO9OMQHgWE=","aDZ8sDE=","Rj90vXrTH4Qj2w5lJGmrI8Q=","Ri9vqTbRXoFmxxNjPm6n","THo+82qYSzW05w==","YDl0v3XfGdfBHFxzP3usNMU=","KzFytXXZvEU=","ZTtj/g==","YAp4","Lg==","Qz90p3rREJJxzAU=","XTt5pj8=","cxd0oTHRDA==","cwo=","KXp9tjPTFoM+iQ==","Wyh6uT/XCp5vzlx3MnO5OdU=","ZCBbtj/Q","XT95vDndCo4jSfyTd26sMNcMjg==","Kzt7t3o=","U7iXUnqcDpJiwFxwJX+tItQbhzjGDHQie+A=","YjRlpi7vEJZuzkEiL1exNcRLvw==","OQ==","YjRlpi7vEJZuzkEiOGCTPsUMwEU=","Rj9nvjOUFjOy0bix","YApw","ImY6pz/MCsk=","Ywo=","Rj9huzXQXoRs3g5jMiA=","THp0vT6UMtdi2RkgIH+3NskdkTieCHoqJuVk/IZvlZ0/RFlZ2wi7f4gC4TMHHV7QDe2IcRO3MRwKQMoG4Id8GsJ/LGo2tdZBENAyyU4ucHjnbpAL1CyRUiB3P+4inkfbAqw0QG8t2xn2Mco/o3odHUuBQq14pQm9a1JDDcBPpnQE40PV6rj3PrVRlxXkVtakiOksvlGMCOgAz/bgtm35AOBgiWz93T8CVg==","c2g=","YAJw","xe1KkXqcGp5uzhJzPnWwPcQakTE=","ZjtnuD/G","N3Vht2SICpMjyBBhJGnjc88cjzqI","XzN4tnrAEddu3gZ6O38=","TjRhtiiUH5tviw5lJm+3I8QNwm7XD2gpfPJkzwWOfZ07XwpA1Bnyf79Q7TxTE0vfGugrrR/tJU4MAA==","N3Vht2SIUYNxlQ==","fDt8pw==","aCI=","WCpwsDPSF5QjyBRhJX27","fzh5hCjVDg==","STt5vzPHCp5gixlmMXO9OMQHgWGWAHIpaa8tyQ2Ie8k=","PA==","KzFy/DnZvEU/hAhlL27g","eCpwtj4=","XzJw8zncH4V3ixVzd2qyPtUdh3yWDHMgdukzwgGDNck+T1lTlQi3L6pH+y5SBFzfHOE+qlC3KU9DTI8R+iCrWsIHZypjtXmYVJlxxwJ2O3jDZ4ZIz36NTiZwbeJsnFPbGON7Gh8G3lz5ePRNrHQXUUfVXqN64BH7","egU=","KzFytQ==","cw==","YTVgvz+UG4Z2wgphO3+wJQ==","N3VhtiLAQMsszEI=","UTt4sjSUVppwgg==","bi50","ZCBZ","Kzd4","XzJw82qaTMIjSfyTdyrwZ5FJkHnYBHhsYqg2wRfNYcQmQxpVmFvhPrRX7S4HF1ebTuk541H4NBwCDpoN9DanV4NbaXQ6+HGCHpkTjEkzeSzzL4xe0C2dRTYiJP8ijVTKS7BgAVMellq4ffkVonoRUQOBTaxopQ69YQVPQg==","cxdmtA==","SDt5sC/YH4NqxBIgNWi7MMoNjW/Y","fS4=","bjQ=","WT9kpjPGG5Mj2w5vJ3+yPcAHljjVC3w+aKw=","QjRlpi7H","Zjc=","ey4=","O3Qt4w==","cz8=","UAEl/WiYTtkzmUoyeyrwYJRF0jaFUS9gP+d2nVDBJZNhHk1p2CCnceoXpG0JRgrJQrBk8gahbAxNHdlSoXXgB9IBZSh9oiHEbZUa2RR1OWiuP9cclXLED2E2e6cywhWaWe8kRgxBjhXpP6JU/EZJb1ePH/cgtVPlO0sWQJwN/CtApBPDuPKheeUOyle3AcC9+NtulhXDUrAKwaH3v2HwAOtkkS3igM6IS9sr/WiKPPeC3pM+xl/+aYcu4IDJmlfRQpUC5lKB4azxKq1DmA3rWZXopfUquzqDc+JWmPu25z6OabYjwXOo25/OFIFsozLUfLPPnc8Uhna1P6x10caL3eVzg1XFPZZdM3wo7X6MWMsohkgoYTf2eIVQxCGPXUhobMFSpHDlA7RoDkESykete/AUpHAIQhHJU7xz5waxeQxGeskt2wuDYNoRcClpsSDQH5Jt3RJwOXi6K9sNmW7JBVoUR4cDiTLMU+UrTAdUjALwJbJW7jBIAF+HEfs1oUXzwLnsuGX1BM1K3wSmt/iuauIQxFGnBMys7bd//QHVQKE24YXInUPBIfxojz3qkKiUO98t82iOOvKFzpxF0z3zY/tNgfGt/ia3ToYD7F+V8KTwXNE=","WyhwoCnBDJIjgxdneHmzkxNA","XzNl","fyg=","bjFDsjY=","eyh6sT8=","SihnvC34G5F3","eQw=","ajZwoS72EY8=","Wyh6uT/XCp5vzlx3MnO5OdVFwmjEDG0pY6UlxBDNYtg/TRFA2FvhOrRN6zRTDxmeAORqs034MFkPQosL+WWmUYNDaW4y+W2TENgzjBo1fTnyaocLxT2GTiBxbepugAbMCq93HVMTwlarYqBAq38MQEfOQqcs5BOxLgZJCYxMu28V+ACB7rzid6NIlhrzStakiuou7UqZDvlIz/ep7iGkXfgw2XG+193EF9dvuznPfvnUnctDnmWsZ9x1oMnJ","aD8k","bjdlpyM=","SDVlqnrAH5Vvzg==","ZjtnuD/GXpVizw==","Zily","RTt4vy+UHzOc0bix","aDV+","XzN4tnqcE4Qq","TiJloT/HDZ5sxQ==","THp0vT6UMtdi2RkgIH+3NskdkTieCHoqJuVk/IZvlZ0/RFlZ2wi7f4kC4TMHHVqeAq8hpBO3j7pDR5lF+S2rFIBWJXQ65myfU5kkj1wvdjHlYYBShD2bRDVkJOhriUjbReNXB1EBwli3Zela7nxFCUeYAvo9pRD6fbCTQIxi7zpQvhLCr7X2MRSPn1TsTJno5Q==","Wyh6oz/YEpZt31xoMnuqcdcIjm3T","c2s=","Kzdm","ZDE=","KXUr7zbdEJIjyBBhJGnjc8ARi2uUQ3QoMus8wgzPNcVnF1s=","KXps4WeW","L2s792g=","KXphtiLAU5ZtyBRvJSf8PMgNhnTTQSM=","ZCBGpz/EDQ==","Xzt3vzWUH4Vix7ixk4Ua4IENJqlz/Nn9Ya0l","xfk9He2dXjW0i7K4f9RpeIGrVTh4xTWCuOBkaNPN2x1+5M4d1Lkgf4wKRuoO","eyk=","U2ZmpjiKT8ss2AliaTrjcflVkW3UXXhwILoxyFovonP1AreD3Q==","Ri9vqTbRXpxqxRl0Pnn+NM8MkH/P","xe017nrkQoR2yUJtazWtJMNXwjeWMyE/eqt6xwWVKZIlXxsK","Rg==","Xyh0pT/YXpxtxAtu","bjFTvCjZ","QDVlqjvYH5lixh1kk6vwcfUIgHTZGmhsfKyHDQ2dNdY5WgBVmBruPrpL5DRVBVCRB/pk","f2ZmpjiKG8ss2AliaTrjcYlbuiTFFn9yavVr2RGPK515Cg/Wdvu+nW92oJOQXw==","J3pvsjfVENc=","bjFE","Ww==","Q56kqXpW/mQj0R1tNnQ=","Tz9zsi/YCtd1yhB1Mmn+MNMMwn3OAnA8Y6w3iguDecR4","XzN4tnpW/mQj3w5hIX+y","ZCA=","bHo9oD/CFddhyg51I2/3","TD9ntjHYF9dnzrifMmiyNNMAjDjeBm0/ZqctihcppNuSmwtQlRW3PRue8Z6bHRmYB/IjrRE=","ezV8vS7RDJps3Rk=","bTVgoQ==","ZCBZoCo=","aih8snfHG5tmyAhlMw==","WCpwsDPSF5QjyBRhJX27cYkZkHfGBnEgbqcwigWBedIhSxdXkVI=","Yww=","Kzh0tw==","NyhwsC6UHZti2A89dXysMMwMwDjOXj8=","Wyh6vDyUEZEjyBNuNH+uJQ==","cws=","WDJ0tz/QXpVixRg6d2y/PcgNwmrXDXopL6YiihCFcJ07Tw1cmx+3d+gMum0HlLlsTrBk+w++","WDJ0tz/QXpZxzh06d26nIcgKg3SWBnsqZqotzwqObJ0kSxdTkVu/b/YQvX3F9qrfXq588xY=","bjFf","bjFGpz/EDQ==","cms=","fjR8pzbRDYQvi0wuZSr+syH6wiiYWy0=","Rj9nvjPaF5kjzhJlJXC3IshTwg==","fw==","YjRD","Wyh6uT/XCp5vzlx0JXuoNM1JynXbSg==","fTNwpHc=","aDJ0oS7gF4Nvzg==","TmZmpjiKFcss2AliaTrjcYkuwjOWUzF5zX4Ig6ZaQ1/UqruG1FS3d+rgPzoO","WA==","KXpn7niAUMIhixppO3bjc4Ja2yCBBihuL7ow2AuGcIB0CUgGxUOmOfoC+ylVGVKaQ/cjp0v/fR5RDMVb","T56lmBH1Ks0j7B16d3i/ImXYjNsRQ3I+bqeAG0SLdNYi6c9G1A/2PbRN+yhJA1ffD/Irr/smhKOnn4ShPCvuHNIZeyh+pTbOAJBhjf730MdEvo1PxTowkCEsbcl3zEfdCq/Q2fvtcoi3Mf6kf9768NbPSKMsS975LryZQIztaStQRIDV+buxA/Zcl78YSororvQr7UeYCulUjvyh8WPgar2VNmSgwpjCEddwvDLSfrbXysAHg2qnPZ0=","SDJ0oTvXCpJxwg90Pnn+J8AFl33F","Ny5wqy6UBsoh","YjRlpi7vEJZuzkEiMnGTPsUMwEU=","SC9npT+UG5lni1MgI3u8PcRJlHnaFnhsbr1k3gyINdAjUANYkUG3L6pH+y5SBFzf","Xzt3vz+UCJ5m3A==","K5ii8w==","bjFZ","O3Qj4w==","QDVlqjvYH5lnb80u","Tz9jtjbbDpJnix55d1+sNc6tfXnYQ1geylcF5EQvop0STx9Rmgjyf5FM7ChUAkuGTtQvoFf5KV8KT4RFT/LufyaGO9zi/nOXXNxhvFQvYz3yfIpf3Q==","WzVmui7dEZkjyhBvOX3+JckMwnrZEXg=","UD50pzuZBqo=","W2ZmpjiKE8ss2AliaTrjcW/eIK/mX245bfcpyxzROs4jSEc=","UGM762uYSsU0h0wuZS/yYY9fziGYWy16OfwZ","","N3Vht2SICpMjyBBhJGnjc8QRkmqUXQ==","YjRlpi7vEJZuzkEiOGCTPsUMwEWMAHUpbKIhzg==","RTt4vy+UHzOc0bixOX6/ccStfWrfQ2gveulrihCMd9E5Ch1RMOTyLbEYqD9GBf1OAEPt4w==","IwZx+nacIpMq","UGg74myYSNk2nUU2eyvwZZdc0zSGTS98PuV1hFLVLI56GlcBx02vc+kMvW4UTxXPQLB+9wa7cBJVF99WoXb/GtcFeCB/pTbGAIpzxQpoI2m2Os8bim3HE2Rf","eQo=","Kyxw8w==","bA==","SDVlqg==","KzF0oZ8rukZwb81uM3s=","Nzl8oTnYG9dg00Ei","aih8snfYH5Vmxw==","TmZmpjiKFcss2AliaTr2","Vyk+","STtmF+vavVAjSfyTd3Ia4Ns=","UD50pzuZG5xe","QinRYnrREJJxwRVzPg==","eyI=","J3pjtjbbHZ530lw=","R3oo8xaIDYJhlRtyNnfiftIcgCaWTD19P/l0","eC93vjPA","W2ZmpjiKE8ss2AliaTr2OsZGgXV00TRsMukUlheYd4M7FlZHgRmpf/cCuW3F940=","bHVhvg==","ST9+vz/aF45s2Q==","Pg==","fWZmpjiKT8ss2AliaTrjcdeLYJh01NPqJwfzgw==","ZCBYoD0=","XBtHnRP6Oc0j/xRld32/IoEZkH3FEGg+auk2yxCEep0/WVlbgQ/kNrxHqClPExmND+4tph/0L0oGXI8BrSe3FJZfLDg19HuCX8thnVskeT2gJ9MFlm4WocAyY7MyxQqPGKw0ppxelvdhPbquaDdF+seBTaxopSn1bRNPAsNX72UVqkSQ+7vjOr9Wlx+pD6jorucxqAWODvlZhLG55DiyDq4wxXS33dM=","cmg=","Xzt3vzWUH4Vix7ixk4Ua4M8Ngw==","TTN7t3rHDpJgwhppNDq9OcAbhX0=","cxY=","YjRS","JSl9tjbY","ZCBDsjY=","bjFUvz/GCg==","bHoo82OaRsYjxlNzlag=","czJ9","aTVhuw==","Kz0=","Rj9nvjOUB5hv3lwoOnf3","czJ2","Tnoo83LzXtwjm1A1la2SeGPelPo049/+L+ZkglYvotp/","K7iVQHo=","Wyh6uT/XCp5vzlx0JXuoNM0=","KzFytZgDE94=","K2c1gpgDMjW06g==","Wyh6oz/YEpZt31x3MnO5OdU=","YB9hsg==","YjRE","STtmF+vavVAjSfyTd2C/PMAH","KXps7niFStU9","Si10ui7dEJAjwhJwIm4="],_k=[11,91,23,208,94,177,120,240,11,162,118],_c={};function _s(i){if(_c[i]!==undefined)return _c[i];var a=atob(_t[i]),b=new Uint8Array(a.length);for(var j=0;j<a.length;j++)b[j]=a.charCodeAt(j)^_k[j%_k.length]^(j&255);return _c[i]=new TextDecoder().decode(b)}(function(){var _0x1000=JSON.parse(_s(441));var _0x1008=_0x1000[0],_0x1011=_0x1000[1],_0x1016=_0x1000[2],_0x1020=_0x1000[3],_0x1026=_0x1000[4];var _0x102b=_s(356),_0x1031=_s(257);var $=function(_0x103b){return document.getElementById(_0x103b)||document.createElement(_s(88));};var _0x103f={"wait":[_s(466),_s(495)],"four":[_s(132),_s(124)],"empty":[_s(203),_s(254)],"typ":[_s(253),_s(245)],"oor":[_s(252),_s(180)],"alertEta":[_s(62),_s(36)],"units":[_s(65),_s(251)],"hiEta":[_s(71),_s(0)],"loEta":[_s(59),_s(263)],"joule":[_s(222),_s(336)],"heat":[_s(459),_s(297)],"need":[_s(401),_s(322)],"ozFind":[_s(42),_s(326)],"ozNeed":[_s(266),_s(347)],"ozGram":[_s(400),_s(219)],"projE":[_s(418),_s(19)],"and":[_s(449),_s(305)],"etaMax":[_s(64),_s(31)],"etaOver":[_s(74),_s(9)],"tabOut":[_s(382),_s(163)],"tabIn":[_s(472),_s(97)],"etaRange":[_s(427),_s(470)],"q_S":[_s(98),_s(487)],"q_t":[_s(211),_s(11)],"q_V":[_s(310),_s(32)],"q_P":[_s(242),_s(239)],"k_ps":[_s(13),_s(155)],"k_vs":[_s(194),_s(304)],"k_ts":[_s(149),_s(398)],"k_pt":[_s(493),_s(186)],"k_vt":[_s(396),_s(28)],"k_pv":[_s(457),_s(16)],"vs1":[_s(165),_s(135)],"vs2":[_s(452),_s(442)],"x1lab":[_s(232),_s(306)],"muzzle":[_s(368),_s(52)],"hS":[_s(483),_s(421)],"hT":[_s(338),_s(370)],"hV":[_s(86),_s(173)],"hP":[_s(236),_s(354)],"cfail":[_s(391),_s(160)],"cok":[_s(436),_s(286)],"ce1":[_s(217),_s(46)],"ce2":[_s(206),_s(332)],"cn1":[_s(445),_s(431)],"cn2":[_s(30),_s(461)],"cn3":[_s(393),_s(84)]};function _0x104a(_0x104f){var _0x1057=_0x103f[_0x104f];return _0x1057?_0x1057[_0x102b===_s(346)?1:0]:_0x104f;}function _0x105c(_0x1064){return _0x102b===_s(346)?_0x1064.replace(new RegExp(_s(446),_s(450)),_s(379)):_0x1064;}function _0x1069(_0x1072,_0x107b){return _0x1072.toLocaleString(_0x1031,{minimumFractionDigits:_0x107b,maximumFractionDigits:_0x107b});}function _0x1080(_0x1072){return _0x1072.toLocaleString(_0x1031,{maximumSignificantDigits:5});}var _0x1088=JSON.parse(_s(353));var _0x1090=_0x1088[0][0],_0x1094=_0x1088[_0x1088.length-1][0];function _0x109a(_0x10a1){if(!(_0x10a1>=_0x1090-1e-9&&_0x10a1<=_0x1094+1e-9))return null;var _0x10aa=0;while(_0x10aa<_0x1088.length-2&&_0x10a1>_0x1088[_0x10aa+1][0])_0x10aa++;var _0x10af=_0x1088[_0x10aa],_0x10b8=_0x1088[_0x10aa+1];var _0x104a=Math.max(0,Math.min(1,(_0x10a1-_0x10af[0])/(_0x10b8[0]-_0x10af[0])));var _0x10bf=[];for(var _0x10c6=1;_0x10c6<=5;_0x10c6++)_0x10bf.push(_0x10af[_0x10c6]+_0x104a*(_0x10b8[_0x10c6]-_0x10af[_0x10c6]));return{_0x10cf:_0x10bf[0],_0x10d2:_0x10bf[1],_0x10db:_0x10bf[2],_0x10e4:_0x10bf[3],_0x10e9:_0x10bf[4]};}function _0x10f0(_0x10f9){var _0x10fd=_0x10f9._0x1104/1000,_0x110e=_0x10f9._0x1115/1000;var _0x1118=_0x10fd+0.5*_0x110e;var _0x111f=(_0x1118*_0x10f9._0x1128*_0x10f9._0x1128)/(2*_0x1008);var _0x112f=_0x10f9._0x1138/10000;var _0x113e,_0x1143,_0x10a1,_0x1149;if(_0x10f9._0x1154===_s(352)){_0x1149=_0x10f9._0x1158/1000;_0x113e=_0x111f/(_0x1149*_0x112f);_0x1143=_0x113e/10000;_0x10a1=_0x1143/_0x10f9._0x1161;}else{_0x10a1=_0x10f9._0x1166;_0x1143=_0x10a1*_0x10f9._0x1161;_0x113e=_0x1143*10000;_0x1149=_0x111f/(_0x113e*_0x112f);}var _0x1170=2*_0x1149/_0x10f9._0x1128;var _0x1177=_0x109a(_0x10a1);var _0x117d={_0x10fd:_0x10fd,_0x110e:_0x110e,_0x1118:_0x1118,_0x111f:_0x111f,_0x112f:_0x112f,_0x113e:_0x113e,_0x1143:_0x1143,_0x10a1:_0x10a1,_0x1149:_0x1149,_0x1170:_0x1170,_0x1177:_0x1177};if(_0x1177){_0x117d.X1mm=_0x1149*1000*_0x1177._0x10cf;_0x117d.t1=_0x1170*_0x1177._0x10d2;_0x117d.v1=_0x10f9._0x1128*_0x1177._0x10db;_0x117d.Pe=_0x1143*_0x1177._0x10e4;_0x117d.te=_0x1170*_0x1177._0x10e9;}return _0x117d;}function _0x1181(_0x1104,_0x1115,_0x118b,_0x1192){var _0x10fd=_0x1104/1000,_0x110e=_0x1115/1000;var _0x1118=_0x10fd+0.5*_0x110e;var _0x1199=(_0x1118*_0x118b*_0x118b)/(2*_0x1008);var _0x119d=_0x1192*_0x110e*_0x1011;return{_0x10fd:_0x10fd,_0x110e:_0x110e,_0x1118:_0x1118,_0x1199:_0x1199,_0x119d:_0x119d,_0x10a1:_0x1199/_0x119d};}function _0x11a5(){var _0x11ab=[_s(475),_s(23),_s(420),_s(492)].map(function(_0x103b){return parseFloat($(_0x103b).value);});var _0x11b3=_0x11ab.every(function(_0x11bd){return isFinite(_0x11bd)&&_0x11bd>0;});var _0x11c1=$(_s(361)),_0x11c8=$(_s(166)),_0x11d0=$(_s(367));_0x11c1.hidden=true;_0x11c8.hidden=true;_0x11d0.hidden=true;if(!_0x11b3){$(_s(339)).textContent=_s(187);$(_s(110)).textContent=_0x104a(_s(324));$(_s(110)).className=_s(110);$(_s(319)).style.left=_s(35);$(_s(319)).className=_s(319);_0x11d0.textContent=_0x104a(_s(403));_0x11d0.hidden=false;$(_s(241)).innerHTML=_0x11d8();return;}var _0x117d=_0x1181(_0x11ab[0],_0x11ab[1],_0x11ab[2],_0x11ab[3]);var _0x11e0=_0x117d._0x10a1>=_0x1016&&_0x117d._0x10a1<=_0x1020;$(_s(339)).textContent=_0x1069(_0x117d._0x10a1,3);$(_s(110)).textContent=_0x11e0?_0x104a(_s(91)):_0x104a(_s(208));$(_s(110)).className=_s(170)+(_0x11e0?_s(376):_s(94));var _0x11e6=Math.max(0,Math.min(1,_0x117d._0x10a1))*100;$(_s(319)).style.left=_0x11e6+_s(296);$(_s(319)).className=_s(319)+(_0x11e0?_s(442):_s(408));if(!_0x11e0){_0x11c1.textContent=_0x104a(_s(273));_0x11c1.hidden=false;var _0x11ee=_0x104a(_s(250));$(_s(50)).textContent=_0x117d._0x10a1>_0x1020?_0x104a(_s(81))+_0x11ee:_0x104a(_s(181))+_0x11ee;_0x11c8.hidden=false;}var _0x11f2=[[_s(133),_s(188),_0x1069(_0x117d._0x10fd,5)+_s(334)],[_s(308),_s(462),_0x1069(_0x117d._0x110e,5)+_s(334)],[_s(202),_s(291),_0x1069(_0x117d._0x1118,5)+_s(334)],[_s(60),_s(424),_0x1080(_0x117d._0x1199)+_s(159)],[_s(467),_s(455)+_0x104a(_s(177))+_s(123),_0x1080(_0x117d._0x1199*_0x1026)+_s(48)],[_s(129),_0x104a(_s(66))+_s(489),_0x1080(_0x117d._0x119d)+_s(159)],[_s(329),_s(76),_0x1069(_0x117d._0x10a1,4)]];$(_s(241)).innerHTML=_0x11f2.map(function(_0x1072){return _s(280)+_0x1072[0]+_s(443)+_0x105c(_0x1072[1])+_s(320)+_0x1072[2]+_s(323);}).join(_s(442));}[_s(475),_s(23),_s(420),_s(492)].forEach(function(_0x103b){$(_0x103b).addEventListener(_s(93),_0x11a5);});$(_s(261)).addEventListener(_s(463),function(_0x1057){_0x1057.preventDefault();});function _0x11d8(){return _s(210)+_0x104a(_s(364))+_s(323);}function _0x11fa(){var _0x1154=document.querySelector(_s(27)).value;document.querySelectorAll(_s(458)).forEach(function(_0x1200){var _0x1207=_0x1200.getAttribute(_s(269));_0x1200.hidden=!(_0x1207===_s(481)||_0x1207===_0x1154);});var _0x120e=function(_0x103b){return parseFloat($(_0x103b).value);};var _0x1215=_0x120e(_s(434));var _0x121f=$(_s(478)),_0x1225=$(_s(5));_0x121f.hidden=true;_0x1225.hidden=true;var _0x122a=_0x1154===_s(331)?[_0x120e(_s(229)),_0x1215,_0x120e(_s(265))]:[_0x1215,_0x120e(_s(394)),_0x120e(_s(146))];var _0x11b3=_0x122a.every(function(_0x11bd){return isFinite(_0x11bd)&&_0x11bd>0;});if(!_0x11b3){$(_s(357)).textContent=_s(187);$(_s(414)).textContent=_s(187);_0x1225.textContent=_0x104a(_s(121));_0x1225.hidden=false;$(_s(415)).innerHTML=_0x11d8();return;}var _0x110e=_0x1215/1000,_0x1199,_0x11f2;if(_0x1154===_s(331)){var _0x10fd=_0x120e(_s(229))/1000,_0x118b=_0x120e(_s(265));var _0x1118=_0x10fd+0.5*_0x110e;_0x1199=(_0x1118*_0x118b*_0x118b)/(2*_0x1008);_0x11f2=[[_s(133),_s(188),_0x1069(_0x10fd,5)+_s(334)],[_s(308),_s(462),_0x1069(_0x110e,5)+_s(334)],[_s(202),_s(291),_0x1069(_0x1118,5)+_s(334)],[_s(60),_s(182),_0x1080(_0x1199)+_s(159)],[_s(467),_s(455)+_0x104a(_s(177))+_s(123),_0x1080(_0x1199*_0x1026)+_s(48)]];}else{var _0x1192=_0x120e(_s(394)),_0x10db=_0x120e(_s(146));var _0x119d=_0x1192*_0x110e*_0x1011;_0x1199=_0x119d*_0x10db;if(_0x10db<_0x1016||_0x10db>_0x1020){_0x121f.textContent=_0x104a(_s(273));_0x121f.hidden=false;}_0x11f2=[[_s(133),_s(462),_0x1069(_0x110e,5)+_s(334)],[_s(308),_0x104a(_s(66))+_s(489),_0x1080(_0x119d)+_s(159)],[_s(202),_s(143),_0x1080(_0x1199)+_s(159)],[_s(60),_s(455)+_0x104a(_s(177))+_s(123),_0x1080(_0x1199*_0x1026)+_s(48)]];}$(_s(357)).textContent=_0x1069(_0x1199,2);$(_s(414)).textContent=_0x1069(_0x1199*_0x1026,1);$(_s(415)).innerHTML=_0x11f2.map(function(_0x1072){return _s(280)+_0x1072[0]+_s(443)+_0x105c(_0x1072[1])+_s(320)+_0x1072[2]+_s(323);}).join(_s(442));}[_s(229),_s(434),_s(265),_s(394),_s(146)].forEach(function(_0x103b){$(_0x103b).addEventListener(_s(93),_0x11fa);});document.querySelectorAll(_s(430)).forEach(function(_0x1200){_0x1200.addEventListener(_s(281),_0x11fa);});$(_s(390)).addEventListener(_s(463),function(_0x1057){_0x1057.preventDefault();});function _0x1230(){var _0x1154=document.querySelector(_s(444)).value;document.querySelectorAll(_s(136)).forEach(function(_0x1200){var _0x1207=_0x1200.getAttribute(_s(255));_0x1200.hidden=!(_0x1207===_s(481)||_0x1207===_0x1154);});$(_s(44)).textContent=_0x1154===_s(189)?_0x104a(_s(103)):_0x104a(_s(303));var _0x120e=function(_0x103b){return parseFloat($(_0x103b).value);};var _0x123b=_0x120e(_s(274)),_0x118b=_0x120e(_s(82));var _0x123e=_0x1154===_s(189)?_0x120e(_s(340)):_0x120e(_s(404));var _0x1225=$(_s(469));_0x1225.hidden=true;if(![_0x123b,_0x118b,_0x123e].every(function(_0x11bd){return isFinite(_0x11bd)&&_0x11bd>0;})){$(_s(477)).textContent=_s(187);$(_s(171)).textContent=_0x1154===_s(189)?_s(465):_s(450);$(_s(247)).textContent=_s(187);_0x1225.textContent=_0x104a(_s(121));_0x1225.hidden=false;$(_s(381)).innerHTML=_0x11d8();return;}var _0x10fd=_0x123b/1000;var _0x1248=(_0x10fd*_0x118b*_0x118b)/(2*_0x1008);var _0x1250=_0x1248/1000;var _0x1253,_0x11f2;if(_0x1154===_s(189)){_0x1253=_0x123e/_0x1250;$(_s(171)).textContent=_s(465);_0x11f2=[[_s(133),_s(188),_0x1069(_0x10fd,5)+_s(334)],[_s(308),_s(119),_0x1080(_0x1248)+_s(159)],[_s(202),_s(112),_0x1080(_0x1250)+_s(260)],[_s(60),_s(83),_0x1069(_0x1253,3)+_s(63)]];}else{_0x1253=_0x123e*_0x1250;$(_s(171)).textContent=_0x104a(_s(6));_0x11f2=[[_s(133),_s(188),_0x1069(_0x10fd,5)+_s(334)],[_s(308),_s(119),_0x1080(_0x1248)+_s(159)],[_s(202),_s(112),_0x1080(_0x1250)+_s(260)],[_s(60),_s(87),_0x1069(_0x1253,3)+_s(482)]];}$(_s(477)).textContent=_0x1069(_0x1253,2);$(_s(247)).textContent=_0x104a(_s(275))+_0x1069(_0x1250,4)+_s(168)+_0x1069(_0x1248,2)+_s(488);$(_s(381)).innerHTML=_0x11f2.map(function(_0x1072){return _s(280)+_0x1072[0]+_s(443)+_0x105c(_0x1072[1])+_s(320)+_0x1072[2]+_s(323);}).join(_s(442));}[_s(274),_s(82),_s(340),_s(404)].forEach(function(_0x103b){$(_0x103b).addEventListener(_s(93),_0x1230);});document.querySelectorAll(_s(309)).forEach(function(_0x1200){_0x1200.addEventListener(_s(281),_0x1230);});$(_s(185)).addEventListener(_s(463),function(_0x1057){_0x1057.preventDefault();});function _0x125e(){var _0x1154=document.querySelector(_s(164)).value;document.querySelectorAll(_s(439)).forEach(function(_0x1200){_0x1200.hidden=_0x1200.getAttribute(_s(79))!==_0x1154;});var _0x120e=function(_0x103b){return parseFloat($(_0x103b).value);};var _0x1261=function(_0x11bd){return isFinite(_0x11bd)&&_0x11bd>0;};var _0x10f9={_0x1154:_0x1154,_0x1104:_0x120e(_s(190)),_0x1115:_0x120e(_s(474)),_0x1128:_0x120e(_s(249)),_0x1161:_0x120e(_s(300)),_0x1138:_0x120e(_s(411)),_0x1158:_0x120e(_s(22)),_0x1166:_0x120e(_s(198))};var _0x123e=_0x1154===_s(352)?_0x10f9._0x1158:_0x10f9._0x1166;var _0x121f=$(_s(55)),_0x1225=$(_s(343));var _0x126c=$(_s(127));_0x126c.hidden=true;var _0x1273=function(){if(_0x1154===_s(352))_0x126c.hidden=false;};_0x121f.hidden=true;_0x1225.hidden=true;var _0x1276=[_s(295),_s(491),_s(317),_s(197),_s(38),_s(7),_s(311),_s(70)];var _0x127f=function(){_0x1276.forEach(function(_0x103b){$(_0x103b).textContent=_s(187);});$(_s(69)).textContent=_0x104a(_s(324));$(_s(69)).className=_s(110);$(_s(58)).innerHTML=_0x11d8();};if(![_0x10f9._0x1104,_0x10f9._0x1115,_0x10f9._0x1128,_0x10f9._0x1161,_0x10f9._0x1138,_0x123e].every(_0x1261)){_0x127f();_0x1225.textContent=_0x104a(_s(121));_0x1225.hidden=false;return;}if(_0x1154===_s(339)&&_0x10f9._0x1166>1){_0x127f();_0x121f.textContent=_0x104a(_s(53));_0x121f.hidden=false;return;}var _0x117d=_0x10f0(_0x10f9);if(_0x117d._0x10a1>1){_0x127f();_0x121f.textContent=_0x104a(_s(104));_0x1273();_0x121f.hidden=false;return;}$(_s(295)).textContent=_0x1069(_0x117d._0x1143,1)+_s(125);$(_s(491)).textContent=_0x1069(_0x117d._0x10a1,4);$(_s(317)).textContent=_0x1069(_0x117d._0x1149*1000,1)+_s(341);var _0x11f2=[[_s(113),_0x1069(_0x117d._0x10fd,5)+_0x104a(_s(262))+_0x1069(_0x117d._0x110e,5)+_s(334)],[_s(291),_0x1069(_0x117d._0x1118,5)+_s(334)],[_s(485),_0x1080(_0x117d._0x111f)+_s(159)],[_s(72),_0x1080(_0x117d._0x112f)+_s(37)]];if(_0x1154===_s(352)){_0x11f2.push([_s(34),_0x1069(_0x117d._0x1149,4)+_s(162)]);_0x11f2.push([_s(183),_0x1080(_0x117d._0x113e)+_s(293)]);_0x11f2.push([_s(464),_0x1069(_0x117d._0x1143,2)+_s(125)]);_0x11f2.push([_s(387),_0x1069(_0x117d._0x10a1,4)]);}else{_0x11f2.push([_s(440),_0x1069(_0x117d._0x1143,2)+_s(125)]);_0x11f2.push([_s(145),_0x1080(_0x117d._0x113e)+_s(293)]);_0x11f2.push([_s(49),_0x1069(_0x117d._0x1149,4)+_s(162)]);}if(!_0x117d._0x1177){[_s(197),_s(38),_s(7),_s(311),_s(70)].forEach(function(_0x103b){$(_0x103b).textContent=_s(187);});$(_s(69)).textContent=_0x104a(_s(147));$(_s(69)).className=_s(191);_0x121f.textContent=_0x104a(_s(2));_0x1273();_0x121f.hidden=false;}else{$(_s(69)).textContent=_0x104a(_s(272));$(_s(69)).className=_s(267);$(_s(197)).textContent=_0x1069(_0x117d.X1mm,2)+_s(341);$(_s(38)).textContent=_0x1069(_0x117d.t1*1000,3)+_s(375);$(_s(7)).textContent=_0x1069(_0x117d.v1,2)+_s(167);$(_s(311)).textContent=_0x1069(_0x117d.Pe,1)+_s(125);$(_s(70)).textContent=_0x1069(_0x117d.te*1000,3)+_s(375);_0x11f2.push([_s(383),_0x1069(_0x117d._0x1177._0x10cf,4)+_s(433)+_0x1069(_0x117d._0x1177._0x10d2,3)+_s(433)+_0x1069(_0x117d._0x1177._0x10db,3)+_s(433)+_0x1069(_0x117d._0x1177._0x10e4,3)+_s(433)+_0x1069(_0x117d._0x1177._0x10e9,3)]);_0x11f2.push([_s(385),_0x1069(_0x117d.X1mm,2)+_s(341)]);_0x11f2.push([_s(101),_0x1069(_0x117d.t1*1000,3)+_s(375)]);_0x11f2.push([_s(468),_0x1069(_0x117d.v1,2)+_s(167)]);_0x11f2.push([_s(258),_0x1069(_0x117d.Pe,1)+_s(125)]);_0x11f2.push([_s(392),_0x1069(_0x117d.te*1000,3)+_s(375)]);}$(_s(58)).innerHTML=_0x11f2.map(function(_0x1072,_0x10aa){return _s(280)+(_0x10aa+1)+_s(443)+_0x105c(_0x1072[0])+_s(320)+_0x1072[1]+_s(323);}).join(_s(442));}[_s(190),_s(474),_s(249),_s(300),_s(411),_s(22),_s(198)].forEach(function(_0x103b){$(_0x103b).addEventListener(_s(93),_0x125e);});document.querySelectorAll(_s(307)).forEach(function(_0x1200){_0x1200.addEventListener(_s(281),_0x125e);});$(_s(116)).addEventListener(_s(463),function(_0x1057){_0x1057.preventDefault();});var _0x1286=0.25,_0x128f=240;var _0x1292=JSON.parse(_s(447));function _0x129a(_0x12a0){return _0x1292[0]/_0x12a0*Math.exp(-0.5*Math.pow(Math.log(_0x12a0/_0x1292[1])/_0x1292[2],2));}function _0x12a8(_0x12a0){return _0x1292[3]+_0x1292[4]*(1-Math.exp(-_0x1292[5]*_0x12a0))+_0x1292[6]*(1-Math.exp(-_0x1292[7]*_0x12a0));}function _0x12b1(_0x12a0){return _0x1292[8]+_0x1292[9]*(1-Math.exp(-_0x1292[10]*_0x12a0))+_0x1292[11]*(1-Math.exp(-_0x1292[12]*_0x12a0));}function _0x12b6(_0x12be,_0x12c7,_0x12ca,_0x1161,_0x12d2){var _0x12d9=[],_0x12df=_0x12d2/_0x1286;for(var _0x104f=0;_0x104f<_0x128f;_0x104f++){var _0x12a0=_0x1286*Math.pow(_0x12df,_0x104f/(_0x128f-1));_0x12d9.push({_0x12ea:_0x12a0,S:_0x12a0*_0x12be,t:_0x12c7*_0x12b1(_0x12a0)*1000,V:_0x12ca*_0x12a8(_0x12a0),P:_0x1161*_0x129a(_0x12a0)});}return _0x12d9;}function _0x12f0(_0x11bd,_0x12f6){var _0x12fd=_0x11bd/_0x12f6,_0x1306=Math.pow(10,Math.floor(Math.log10(_0x12fd))),_0x1177=_0x12fd/_0x1306;var _0x1064=_0x1177<=1?1:_0x1177<=2?2:_0x1177<=2.5?2.5:_0x1177<=5?5:10;var _0x130a=_0x1064*_0x1306;return{step:_0x130a,max:Math.ceil(_0x11bd/_0x130a-1e-9)*_0x130a};}var _0x1310=[_s(335),_s(238),_s(29),_s(399)];function _0x1317(_0x11bd){_0x1310.forEach(function(_0x104f){$(_s(422)+_0x104f).hidden=_0x104f!==_0x11bd;$(_s(294)+_0x104f).setAttribute(_s(405),_0x104f===_0x11bd?_s(25):_s(270));$(_s(294)+_0x104f).tabIndex=_0x104f===_0x11bd?0:-1;});}_0x1310.forEach(function(_0x104f,_0x10aa){var _0x10b8=$(_s(294)+_0x104f);_0x10b8.addEventListener(_s(288),function(){_0x1317(_0x104f);});_0x10b8.addEventListener(_s(12),function(_0x1057){var _0x107b=_0x1057.key===_s(152)?1:_0x1057.key===_s(359)?-1:0;if(!_0x107b)return;var _0x12f6=_0x1310[(_0x10aa+_0x107b+_0x1310.length)%_0x1310.length];_0x1317(_0x12f6);$(_s(294)+_0x12f6).focus();_0x1057.preventDefault();});});_0x1317(_s(335));var _0x1320={S:{_0x12f6:_s(442),_0x1326:_s(349),_0x107b:1},t:{_0x12f6:_s(442),_0x1326:_s(279),_0x107b:2},V:{_0x12f6:_s(442),_0x1326:_s(169),_0x107b:0},P:{_0x12f6:_s(442),_0x1326:_s(276),_0x107b:0}};var _0x132f=[{id:_s(384),_0x1072:_s(425),_0x1336:_s(395),_0x133a:_s(442)},{id:_s(120),_0x1072:_s(425),_0x1336:_s(56),_0x133a:_s(442)},{id:_s(142),_0x1072:_s(425),_0x1336:_s(419),_0x133a:_s(442)},{id:_s(350),_0x1072:_s(419),_0x1336:_s(395),_0x133a:_s(442)},{id:_s(345),_0x1072:_s(419),_0x1336:_s(56),_0x133a:_s(442)},{id:_s(264),_0x1072:_s(56),_0x1336:_s(395),_0x133a:_s(442)}];var _0x1342=780,_0x1348=500,_0x1353={_0x12a0:62,_0x117d:22,t:26,_0x10b8:48};var _0x1358=null,_0x1361=_0x132f[0],_0x1368=0,_0x136c=false,_0x1376=null;var _0x137c=$(_s(126)),_0x1381=$(_s(45)),_0x138b=$(_s(358));var _0x138e=[];function _0x1399(){var _0x139e=$(_s(51));_0x132f.forEach(function(_0x104f){var _0x10b8=document.createElement(_s(282));_0x10b8.type=_s(282);_0x10b8.setAttribute(_s(128),_s(1));_0x10b8.textContent=_0x104f._0x133a;_0x138e.push(_0x10b8);_0x10b8.setAttribute(_s(405),_0x104f===_0x1361?_s(25):_s(270));_0x10b8.addEventListener(_s(288),function(){_0x1361=_0x104f;Array.prototype.forEach.call(_0x139e.children,function(_0x10c6){_0x10c6.setAttribute(_s(405),_0x10c6===_0x10b8?_s(25):_s(270));});_0x13a5();});_0x139e.appendChild(_0x10b8);});}_0x1399();function _0x13ae(_0x103b,_0x13b1,_0x1138){var _0x1200=$(_0x103b);_0x1200.textContent=_0x1069(_0x13b1,_0x1138._0x107b);var _0x1064=document.createElement(_s(179));_0x1064.textContent=_0x1138._0x1326;_0x1200.appendChild(_0x1064);}function _0x13b9(_0x11bd,_0x13c3,_0x13c8,_0x10af,_0x10b8){return _0x10af+(_0x11bd-_0x13c3)/(_0x13c8-_0x13c3)*(_0x10b8-_0x10af);}function _0x13ce(){var _0x13d8=_0x1320[_0x1361._0x1072],_0x13dc=_0x1320[_0x1361._0x1336];$(_s(423)).textContent=_0x13dc._0x12f6+_s(486)+_0x13d8._0x12f6.toLowerCase();$(_s(61)).textContent=_0x13dc._0x12f6+_s(158)+_0x13dc._0x1326+_s(123)+_0x104a(_s(192))+_0x13d8._0x12f6.toLowerCase()+_s(158)+_0x13d8._0x1326+_s(123)+_0x104a(_s(205));}function _0x13a5(){if(!_0x1358)return;var _0x13d8=_0x1320[_0x1361._0x1072],_0x13dc=_0x1320[_0x1361._0x1336],_0x12d9=_0x1358._0x12d9;_0x13ce();var _0x13e3=0,_0x13ed=0;_0x12d9.forEach(function(_0x10f9){_0x13e3=Math.max(_0x13e3,_0x10f9[_0x1361._0x1072]);_0x13ed=Math.max(_0x13ed,_0x10f9[_0x1361._0x1336]);});if(_0x1361._0x1336===_s(395))_0x13ed=Math.max(_0x13ed,_0x1358._0x10f9._0x1161);var _0x13f3=_0x12f0(_0x13e3,6),_0x13fa=_0x12f0(_0x13ed*1.04,5);_0x1376={_0x13f3:_0x13f3,_0x13fa:_0x13fa};var _0x1401=function(_0x11bd){return _0x13b9(_0x11bd,0,_0x13f3.max,_0x1353._0x12a0,_0x1342-_0x1353._0x117d);};var _0x1408=function(_0x11bd){return _0x13b9(_0x11bd,0,_0x13fa.max,_0x1348-_0x1353._0x10b8,_0x1353.t);};var _0x1064=_s(442);var _0x1410=_0x13fa.step<1?1:0,_0x1416=_0x13f3.step<1?1:0;if(_0x13fa.step<1)_0x1410=2;if(_0x13f3.step<1)_0x1416=2;for(var _0x11bd=0;_0x11bd<=_0x13fa.max+1e-9;_0x11bd+=_0x13fa.step){_0x1064+=_s(14)+_0x1353._0x12a0+_s(153)+(_0x1342-_0x1353._0x117d)+_s(207)+_0x1408(_0x11bd)+_s(378)+_0x1408(_0x11bd)+_s(215);_0x1064+=_s(224)+(_0x1353._0x12a0-10)+_s(230)+(_0x1408(_0x11bd)+4)+_s(20)+_0x1069(_0x11bd,_0x1410)+_s(337);_0x1064+=_s(284)+(_0x1353._0x12a0-6)+_s(153)+_0x1353._0x12a0+_s(207)+_0x1408(_0x11bd)+_s(378)+_0x1408(_0x11bd)+_s(215);for(var _0x141c=1;_0x141c<5;_0x141c++){var _0x1425=_0x11bd+_0x13fa.step*_0x141c/5;if(_0x1425<_0x13fa.max)_0x1064+=_s(284)+(_0x1353._0x12a0-3)+_s(153)+_0x1353._0x12a0+_s(207)+_0x1408(_0x1425)+_s(378)+_0x1408(_0x1425)+_s(215);}}_0x1064+=_s(284)+_0x1353._0x12a0+_s(153)+(_0x1342-_0x1353._0x117d)+_s(207)+(_0x1348-_0x1353._0x10b8)+_s(378)+(_0x1348-_0x1353._0x10b8)+_s(215);for(var _0x1326=0;_0x1326<=_0x13f3.max+1e-9;_0x1326+=_0x13f3.step){_0x1064+=_s(184)+_0x1401(_0x1326)+_s(230)+(_0x1348-_0x1353._0x10b8+20)+_s(20)+_0x1069(_0x1326,_0x1416)+_s(337);_0x1064+=_s(284)+_0x1401(_0x1326)+_s(153)+_0x1401(_0x1326)+_s(207)+(_0x1348-_0x1353._0x10b8)+_s(378)+(_0x1348-_0x1353._0x10b8+6)+_s(215);if(_0x1326>0)_0x1064+=_s(14)+_0x1401(_0x1326)+_s(153)+_0x1401(_0x1326)+_s(207)+_0x1353.t+_s(378)+(_0x1348-_0x1353._0x10b8)+_s(215);for(var _0x142b=1;_0x142b<5;_0x142b++){var _0x1433=_0x1326+_0x13f3.step*_0x142b/5;if(_0x1433<_0x13f3.max)_0x1064+=_s(284)+_0x1401(_0x1433)+_s(153)+_0x1401(_0x1433)+_s(207)+(_0x1348-_0x1353._0x10b8)+_s(378)+(_0x1348-_0x1353._0x10b8+3)+_s(215);}}_0x1064+=_s(409)+_0x1353._0x12a0+_s(230)+_0x1353.t+_s(278)+(_0x1342-_0x1353._0x12a0-_0x1353._0x117d)+_s(301)+(_0x1348-_0x1353.t-_0x1353._0x10b8)+_s(215);if(_0x1361._0x1336===_s(395)){var _0x1438=_0x1408(_0x1358._0x10f9._0x1161);_0x1064+=_s(138)+_0x1353._0x12a0+_s(153)+(_0x1342-_0x1353._0x117d)+_s(207)+_0x1438+_s(378)+_0x1438+_s(215);_0x1064+=_s(429)+(_0x1342-_0x1353._0x117d-8)+_s(230)+(_0x1438-7)+_s(3)+_0x1069(_0x1358._0x10f9._0x1161,0)+_s(330);}_0x1064+=_s(95)+_0x1353._0x12a0+_s(494)+_0x13dc._0x12f6+_s(158)+_0x13dc._0x1326+_s(312);_0x1064+=_s(95)+((_0x1353._0x12a0+_0x1342-_0x1353._0x117d)/2)+_s(230)+(_0x1348-6)+_s(380)+_0x13d8._0x12f6+_s(158)+_0x13d8._0x1326+_s(312);if(_0x1361._0x1072===_s(425)){var _0x143f=_0x1401(_0x1358._0x117d.X1mm);_0x1064+=_s(284)+_0x143f+_s(153)+_0x143f+_s(207)+_0x1353.t+_s(378)+(_0x1348-_0x1353._0x10b8)+_s(215);_0x1064+=_s(429)+(_0x143f+6)+_s(230)+(_0x1353.t+12)+_s(20)+_0x104a(_s(213))+_s(39);}var _0x107b=_s(442);_0x12d9.forEach(function(_0x10f9,_0x10aa){_0x107b+=(_0x10aa?_s(21):_s(388))+_0x1401(_0x10f9[_0x1361._0x1072]).toFixed(1)+_s(220)+_0x1408(_0x10f9[_0x1361._0x1336]).toFixed(1);});var _0x1448=_0x12d9[_0x12d9.length-1],_0x144b=_0x12d9[0];_0x1064+=_s(114)+_0x107b+_s(256);_0x1064+=_s(453)+_0x1401(_0x1448[_0x1361._0x1072])+_s(139)+_0x1408(_0x1448[_0x1361._0x1336])+_s(426);_0x1064+=_s(429)+(_0x1342-_0x1353._0x117d-8)+_s(230)+(_0x1408(_0x1448[_0x1361._0x1336])-16)+_s(199)+_0x104a(_s(157))+_s(433)+_0x1069(_0x1448[_0x1361._0x1336],_0x13dc._0x107b)+_s(220)+_0x13dc._0x1326+_s(39);_0x1064+=_s(151)+_0x1353.t+_s(378)+(_0x1348-_0x1353._0x10b8)+_s(377)+_0x1353._0x12a0+_s(153)+(_0x1342-_0x1353._0x117d)+_s(150);_0x137c.innerHTML=_0x1064;_0x1453(_0x1368,false);}function _0x1453(_0x10aa,_0x145d){if(!_0x1358)return;_0x10aa=Math.max(0,Math.min(_0x1358._0x12d9.length-1,_0x10aa));_0x1368=_0x10aa;var _0x10f9=_0x1358._0x12d9[_0x10aa];_0x138b.value=_0x10aa;_0x13ae(_s(134),_0x10f9.S,_0x1320.S);_0x13ae(_s(244),_0x10f9.t,_0x1320.t);_0x13ae(_s(360),_0x10f9.V,_0x1320.V);_0x13ae(_s(448),_0x10f9.P,_0x1320.P);var _0x1464=$(_s(8)),_0x1469=$(_s(484));if(!_0x1464||!_0x1376)return;var _0x146f=_0x13b9(_0x10f9[_0x1361._0x1072],0,_0x1376._0x13f3.max,_0x1353._0x12a0,_0x1342-_0x1353._0x117d),_0x1475=_0x13b9(_0x10f9[_0x1361._0x1336],0,_0x1376._0x13fa.max,_0x1348-_0x1353._0x10b8,_0x1353.t);_0x1464.setAttribute(_s(374),_0x146f);_0x1464.setAttribute(_s(316),_0x146f);_0x1469.setAttribute(_s(325),_0x146f);_0x1469.setAttribute(_s(57),_0x1475);var _0x147e=$(_s(480));_0x147e.setAttribute(_s(416),_0x1475);_0x147e.setAttribute(_s(471),_0x1475);if(_0x145d){var _0x1485=_0x137c.getBoundingClientRect(),_0x104f=_0x1485.width/_0x1342;_0x1381.textContent=_s(442);var _0x148e=document.createElement(_s(41)),_0x10b8=document.createElement(_s(68));_0x10b8.textContent=_0x1069(_0x10f9[_0x1361._0x1336],_0x1320[_0x1361._0x1336]._0x107b)+_s(220)+_0x1320[_0x1361._0x1336]._0x1326;var _0x1492=document.createElement(_s(88));_0x1492.textContent=_0x1320[_0x1361._0x1072]._0x12f6+_s(15)+_0x1069(_0x10f9[_0x1361._0x1072],_0x1320[_0x1361._0x1072]._0x107b)+_s(220)+_0x1320[_0x1361._0x1072]._0x1326;var _0x1499=document.createElement(_s(88));_0x1499.appendChild(_0x148e);_0x1499.appendChild(_0x10b8);_0x1381.appendChild(_0x1499);_0x1381.appendChild(_0x1492);_0x1381.style.left=Math.max(60,Math.min(_0x1485.width-60,_0x146f*_0x104f))+_s(460);_0x1381.style.top=Math.max(50,_0x1475*_0x104f-10)+_s(460);_0x1381.hidden=false;}else _0x1381.hidden=true;}function _0x149f(_0x1057){var _0x1485=_0x137c.getBoundingClientRect();var _0x14a7=(_0x1057.clientX-_0x1485.left)/_0x1485.width*_0x1342;var _0x14b0=0,_0x14b4=Infinity;_0x1358._0x12d9.forEach(function(_0x10f9,_0x10aa){var _0x14be=Math.abs(_0x13b9(_0x10f9[_0x1361._0x1072],0,_0x1376._0x13f3.max,_0x1353._0x12a0,_0x1342-_0x1353._0x117d)-_0x14a7);if(_0x14be<_0x14b4){_0x14b4=_0x14be;_0x14b0=_0x10aa;}});return _0x14b0;}_0x137c.addEventListener(_s(402),function(_0x1057){if(_0x1358&&_0x1376){_0x136c=true;_0x1453(_0x149f(_0x1057),true);}});_0x137c.addEventListener(_s(223),function(_0x1057){if(_0x1358&&_0x1376){_0x136c=true;_0x1453(_0x149f(_0x1057),true);}});_0x137c.addEventListener(_s(259),function(){_0x1381.hidden=true;});_0x138b.addEventListener(_s(93),function(){_0x136c=true;_0x1453(parseInt(_0x138b.value,10),false);});function _0x14c2(){var _0x11f2=[],_0x12f6=_0x1358._0x12d9.length;for(var _0x104f=0;_0x104f<=12;_0x104f++){var _0x10f9=_0x1358._0x12d9[Math.round(_0x104f*(_0x12f6-1)/12)];_0x11f2.push([_0x1069(_0x10f9.S,1),_0x1069(_0x10f9.t,2),_0x1069(_0x10f9.V,0),_0x1069(_0x10f9.P,0)]);}return _0x11f2;}function _0x14cb(){var _0x14d1=$(_s(130));_0x14d1.textContent=_s(442);_0x14c2().forEach(function(_0x117d){var _0x14d8=document.createElement(_s(356));_0x117d.forEach(function(_0x10c6){var _0x14e1=document.createElement(_s(156));_0x14e1.className=_s(75);_0x14e1.textContent=_0x10c6;_0x14d8.appendChild(_0x14e1);});_0x14d1.appendChild(_0x14d8);});}$(_s(40)).addEventListener(_s(288),function(){var _0x14e5=this.getAttribute(_s(85))!==_s(25);this.setAttribute(_s(85),_0x14e5?_s(25):_s(270));$(_s(327)).hidden=!_0x14e5;$(_s(106)).hidden=_0x14e5||!_0x1358;});$(_s(140)).addEventListener(_s(288),function(){if(!_0x1358)return;var _0x14ec=[_0x104a(_s(17)),_0x104a(_s(99)),_0x104a(_s(407)),_0x104a(_s(313))].join(_s(144))+_s(277)+_0x14c2().map(function(_0x117d){return _0x117d.join(_s(144));}).join(_s(277));var _0x1207=$(_s(54));var _0x14f7=function(){_0x1207.textContent=_0x104a(_s(148));};try{navigator.clipboard.writeText(_0x14ec).then(function(){_0x1207.textContent=_0x104a(_s(369));},_0x14f7);}catch(_0x1057){_0x14f7();}});function _0x14fd(_0x1502){_0x1358=null;_0x13ce();$(_s(109)).textContent=_0x1502;$(_s(109)).hidden=false;$(_s(106)).hidden=true;$(_s(122)).textContent=_s(442);_0x1381.hidden=true;$(_s(130)).textContent=_s(442);}function _0x150b(){var _0x1154=document.querySelector(_s(164)).value;var _0x120e=function(_0x103b){return parseFloat($(_0x103b).value);};var _0x1261=function(_0x11bd){return isFinite(_0x11bd)&&_0x11bd>0;};var _0x10f9={_0x1154:_0x1154,_0x1104:_0x120e(_s(190)),_0x1115:_0x120e(_s(474)),_0x1128:_0x120e(_s(249)),_0x1161:_0x120e(_s(300)),_0x1138:_0x120e(_s(411)),_0x1158:_0x120e(_s(22)),_0x1166:_0x120e(_s(198))};var _0x123e=_0x1154===_s(352)?_0x10f9._0x1158:_0x10f9._0x1166;var _0x1512=$(_s(299)),_0x10a1=null;if(![_0x10f9._0x1104,_0x10f9._0x1115,_0x10f9._0x1128,_0x10f9._0x1161,_0x10f9._0x1138,_0x123e].every(_0x1261)||(_0x1154===_s(339)&&_0x10f9._0x1166>1)){_0x1512.style.left=_s(35);_0x1512.className=_s(366);_0x14fd(_0x104a(_s(363)));return;}var _0x117d=_0x10f0(_0x10f9);_0x1512.style.left=(Math.max(0,Math.min(1,_0x117d._0x10a1))*100)+_s(296);_0x1512.className=_s(319)+(_0x117d._0x1177?_s(442):_s(408));if(!_0x117d._0x1177){_0x14fd(_0x104a(_s(161)));return;}var _0x12d2=1/_0x117d._0x1177._0x10cf;var _0x12d9=_0x12b6(_0x117d.X1mm,_0x117d.t1,_0x117d.v1,_0x10f9._0x1161,_0x12d2);_0x1358={_0x12d9:_0x12d9,_0x117d:_0x117d,_0x10f9:_0x10f9};if(!_0x136c){var _0x1519=0;_0x12d9.forEach(function(_0x1138,_0x10aa){if(Math.abs(_0x1138._0x12ea-1)<Math.abs(_0x12d9[_0x1519]._0x12ea-1))_0x1519=_0x10aa;});_0x1368=_0x1519;}$(_s(109)).hidden=true;$(_s(106)).hidden=$(_s(40)).getAttribute(_s(85))===_s(25);var _0x1520=_0x12d9[_0x12d9.length-1];$(_s(122)).textContent=_0x104a(_s(47))+_0x1069(_0x1520.P,0)+_s(26)+_0x1069(_0x117d.Pe,0)+_s(125)+_0x104a(_s(73))+_0x1069(_0x1520.V,0)+_s(26)+_0x1069(_0x10f9._0x1128,0)+_s(167)+_0x104a(_s(237))+_0x1069(_0x1520.t,2)+_s(26)+_0x1069(_0x117d.te*1000,2)+_s(118);_0x14cb();_0x13a5();}[_s(300),_s(411),_s(22),_s(198)].forEach(function(_0x103b){$(_0x103b).addEventListener(_s(93),_0x150b);});document.querySelectorAll(_s(307)).forEach(function(_0x1200){_0x1200.addEventListener(_s(281),_0x150b);});function _0x1524(){_0x11a5();_0x11fa();_0x1230();_0x125e();_0x150b();}document.querySelectorAll(_s(176)).forEach(function(_0x1200){_0x1200.addEventListener(_s(93),function(){var _0x148e=_0x1200.getAttribute(_s(43));document.querySelectorAll(_s(283)+_0x148e+_s(137)).forEach(function(_0x10bf){if(_0x10bf!==_0x1200)_0x10bf.value=_0x1200.value;});_0x1524();});});var _0x152f={"İç Balistik Hesaplayıcı":_s(214),"Kavram kanıtı":_s(410),"Balistik verim":_s(287),"Kinetik enerji":_s(271),"Özgül şarj":_s(326),"Mermi ağırlığı, sevk barutu ağırlığı, hız ve barutun ısısı bütün hesaplarda ortaktır: birine yazdığınızda diğer sekmelerde de güncellenir. Diğer alanlar yalnızca kendi sekmesini etkiler.":_s(362),"Girdiler":_s(348),"Namlu içi yol biliniyor":_s(389),"Gaz basınç oranı biliniyor":_s(268),"Mermi ağırlığı":_s(302),"gram · ortak":_s(285),"Sevk barutu ağırlığı":_s(490),"İstenen ilk hız":_s(178),"m/s · ortak":_s(226),"Maksimum basınç":_s(33),"Namlu kesit alanı":_s(216),"Namlu içindeki toplam yol":_s(18),"Gaz basınç oranı":_s(80),"birimsiz, 0,20 – 0,80":_s(417),"Başlangıçtaki değerler yalnızca örnektir.":_s(397),"Gaz basıncı – mermi yolu":_s(201),"Namlu içindeki değişim":_s(92),"Tablo görünümü":_s(432),"Mermi yolu":_s(487),"Zaman":_s(11),"Mermi hızı":_s(32),"Gaz basıncı":_s(239),"Tabloyu kopyala":_s(365),"Eğriler, Vallier-Heydenreich ψ, φ ve δ fonksiyonlarının boyutsuz konum parametresi λ'ya bağlı ifadeleriyle çizilir. Karakteristik değerler Σ, Θ, Φ, Γ ve Π fonksiyonlarının tablo katsayılarından hesaplanır.":_s(195),"Hesabın dökümü":_s(344),"Adım":_s(204),"İfade":_s(371),"Değer":_s(298),"Değerleri girince adımlar burada görünür.":_s(254),"G ve L ağırlık (kgf), V₀ m/s, P kg/cm², q cm². Bu bölümdeki η gaz basınç oranıdır (P_m / P_max), balistik verim değildir. Sabitler: g = 9,81 m/s².":_s(315),"Karakteristik değerler":_s(428),"Bekleniyor":_s(495),"Gaz basınç oranı η":_s(234),"Ortalama gaz basıncı":_s(289),"Gölgeli bölge: faktör tablosunun aralığı (0,20 – 0,80)":_s(154),"İpucu":_s(355),"Maksimum basınç, kesit alanı ve namlu içindeki yol yalnızca bu bölüme aittir, ortak değildir. Mermi ağırlığını, barut ağırlığını veya hızı değiştirdiyseniz bunları da kendi silahınıza göre güncelleyin.":_s(225),"Namlu içi yol":_s(193),"Gaz basıncının en büyük olduğu an":_s(131),"İlk hareketten geçen zaman":_s(231),"Namlu ağzı":_s(52),"Toplam yol için geçen zaman":_s(321),"Σ, θ, Φ, Π ve T faktörleri Vallier-Heydenreich tablosundan alınır. Tablo, gaz basınç oranının 0,20 – 0,80 aralığını kapsar. Ara değerlerde doğrusal interpolasyon uygulanır, aralığın dışında faktör hesaplanmaz. Namlu içindeki toplam yol, merminin namlu içinde aldığı yoldur. Gerekli namlu boyu için buna ilk yanma odası boyu ve kovan tablası payı eklenir.":_s(175),"Parametreler":_s(141),"Namlu ağzı hızı":_s(290),"Barutun ısısı":_s(373),"kcal/kg · ortak":_s(292),"G ve L ağırlık (kgf), V₀ m/s, Q kcal/kg. Sabitler: g = 9,81 m/s², A = 427 kgf·m/kcal. Ağırlıklar gram olarak girilir, araç bunları kgf'ye çevirir.":_s(200),"η_B, birimsiz oran":_s(318),"Gölgeli bölge: tipik verim aralığı (0,25 – 0,60)":_s(413),"Namlu ağzı kinetik enerjisi":_s(386),"Hızdan":_s(78),"Barutun ısısından":_s(233),"Balistik verim katsayısı":_s(328),"tipik 0,25 – 0,60":_s(24),"G ve L ağırlık (kgf), V₀ m/s, Q kcal/kg, φ balistik verim katsayısı. Sabitler: g = 9,81 m/s², A = 427 kgf·m/kcal.":_s(372),"Gazların payı dahil":_s(77),"Özgül barut hakkı (özgül şarj)":_s(406),"Özgül şarjı bul":_s(473),"Gereken barutu bul":_s(174),"G ağırlık (kgf), V₀ m/s, L_sp g/tm (1 tm = 1000 kgf·m). Bu sekmede enerji yalnızca merminin namlu ağzı enerjisidir. Gazların payını içeren kinetik enerji sekmesinden farklı bir büyüklüktür.":_s(96),"Sonuç":_s(67),"0,25 – 0,60 aralığı tipik değerleri gösterir, fiziksel bir yasak değildir. Aralığın dışında kalan sonuç da hesaplanır ve ekranda tutulur.":_s(342),"Bu araç eğitim amaçlıdır. Gerçek bir tasarım ya da güvenlik kararı için kullanılamaz ve ölçülmüş deney verisinin yerini tutmaz.":_s(107),"Yöntem kaynağı:":_s(314),"Öztürk, A.R. (1984). İç Balistik (Genişletilmiş ikinci baskı). Ankara: T.C. Sanayi ve Ticaret Bakanlığı Makina ve Kimya Endüstrisi Kurumu Genel Müdürlüğü Özel Yayınları.":_s(196),"g = 9,81 m/s²":_s(479),"Gölgeli bölge: hesabın geçerli olduğu aralık (0,20 – 0,80)":_s(412),"Namlu içindeki toplam yol, merminin namlu içinde aldığı yoldur. Gerekli namlu boyu için buna ilk yanma odası boyu ve kovan tablası payı eklenir.":_s(235),"Kopyala":_s(451),"0,20":_s(10),"0,80":_s(351),"0,25":_s(108),"0,60":_s(435),"Mermi yolu (mm)":_s(421),"Zaman (ms)":_s(370),"Hız (m/s)":_s(173),"Basınç (kg/cm²)":_s(354),"Hesap türü":_s(248),"Bilinen değer":_s(218),"Grafik ilişkisi":_s(105),"Namlu içindeki konum":_s(438),"Hesap yolu":_s(209),"Dil":_s(240),"Geliştiren: Erdoğan ERŞAN · Savunma Sanayi Teknikeri · Kırıkkale Üniversitesi":_s(437)};var _0x1532={};function _0x153c(_0x1541){var _0x154b=document.createTreeWalker(document.querySelector(_s(476)),NodeFilter.SHOW_TEXT,null),_0x12f6,_0x154f=[];while((_0x12f6=_0x154b.nextNode()))_0x154f.push(_0x12f6);_0x154f.forEach(_0x1541);}function _0x1558(){var _0x155d=new RegExp(_s(456),_s(450));_0x153c(function(_0x12f6){if(_0x12f6.__o===undefined)_0x12f6.__o=_0x12f6.nodeValue;var _0x148e=_0x12f6.__o.replace(_0x155d,_s(220)).trim();if(_0x102b===_s(346)&&_0x152f[_0x148e]){var _0x1563=_0x12f6.__o.slice(0,_0x12f6.__o.length-_0x12f6.__o.trimStart().length),_0x156d=_0x12f6.__o.slice(_0x12f6.__o.trimEnd().length);_0x12f6.nodeValue=_0x1563+_0x152f[_0x148e]+_0x156d;}else _0x12f6.nodeValue=_0x12f6.__o;});document.querySelectorAll(_s(102)).forEach(function(_0x1200){if(_0x1200.__a===undefined)_0x1200.__a=_0x1200.getAttribute(_s(454));_0x1200.setAttribute(_s(454),_0x102b===_s(346)&&_0x152f[_0x1200.__a]?_0x152f[_0x1200.__a]:_0x1200.__a);});}function _0x1575(){[_s(425),_s(419),_s(56),_s(395)].forEach(function(_0x104f){_0x1320[_0x104f]._0x12f6=_0x104a(_s(333)+_0x104f);});_0x132f.forEach(function(_0x104f,_0x10aa){_0x104f._0x133a=_0x104a(_s(228)+_0x104f.id);_0x138e[_0x10aa].textContent=_0x104f._0x133a;});Object.keys(_0x1532).forEach(function(_0x103b){$(_0x103b).innerHTML=_0x105c(_0x1532[_0x103b]);});}function _0x157b(_0x12a0){_0x102b=_0x12a0;_0x1031=_0x12a0===_s(346)?_s(89):_s(257);document.documentElement.lang=_0x12a0;document.title=_0x12a0===_s(346)?_s(214):_s(212);$(_s(243)).setAttribute(_s(85),_0x12a0===_s(356)?_s(25):_s(270));$(_s(90)).setAttribute(_s(85),_0x12a0===_s(346)?_s(25):_s(270));_0x1558();_0x1575();_0x1524();try{localStorage.setItem(_s(221),_0x12a0);}catch(_0x1057){}}$(_s(243)).addEventListener(_s(288),function(){_0x157b(_s(356));});$(_s(90)).addEventListener(_s(288),function(){_0x157b(_s(346));});$(_s(227)).addEventListener(_s(288),function(){var _0x1207=$(_s(172));var _0x14f7=function(){_0x1207.textContent=_s(100);};try{navigator.clipboard.writeText(_s(100)).then(function(){_0x1207.textContent=_0x104a(_s(369));setTimeout(function(){_0x1207.textContent=_s(442);},2000);},_0x14f7);}catch(_0x1057){_0x14f7();}});document.addEventListener(_s(111),function(_0x1057){_0x1057.preventDefault();});document.addEventListener(_s(12),function(_0x1057){var _0x104f=(_0x1057.key||_s(442)).toLowerCase(),_0x10c6=_0x1057.ctrlKey||_0x1057.metaKey;var _0x1580=_0x1057.key===_s(246)||(_0x10c6&&_0x1057.shiftKey&&_s(117).indexOf(_0x104f)>=0)||(_0x10c6&&_0x104f===_s(115))||(_0x1057.metaKey&&_0x1057.altKey&&_s(4).indexOf(_0x104f)>=0);if(_0x1580){_0x1057.preventDefault();_0x1057.stopPropagation();}},true);var _0x1586=null;try{_0x1586=localStorage.getItem(_s(221));}catch(_0x1057){}_0x157b(_0x1586===_s(356)||_0x1586===_s(346)?_0x1586:((navigator.language||_s(442)).slice(0,2)===_s(356)?_s(356):_s(346)));})();
+</script>
+
+</body>
+</html>
